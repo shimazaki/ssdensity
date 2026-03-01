@@ -4,7 +4,7 @@ setup(
   name    = "ssdensity",
   packages = [ "ssdensity", "ssdensity.classic" ],
   version = "1.2.0",
-  description = 'Optimal fixed or locally adaptive kernel density estimation',
+  description = 'Optimal histogram and fixed or locally adaptive kernel density estimation',
   long_description=open('README.md').read(),
   long_description_content_type='text/markdown',
   author = "Lee A.D. Cooper",

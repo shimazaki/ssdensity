@@ -1,11 +1,11 @@
 # ssdensity
 
-Optimal fixed or locally adaptive kernel density estimation for 1-D data.
+Optimal histogram and fixed or locally adaptive kernel density estimation for 1-D data.
 
 > Forked from [AdaptiveKDE](https://github.com/shimazaki/AdaptiveKDE)
 > ([PyPI: adaptivekde](https://pypi.org/project/adaptivekde/)) with
-> significant performance optimizations. Original (unoptimized) code
-> is preserved in the `classic` subpackage.
+> significant performance improvements. Original code is preserved
+> in the `classic` subpackage.
 
 ## Installation
 
@@ -71,15 +71,14 @@ trade-off between local adaptivity and global smoothness; it is optimized
 via golden-section search. See
 [neuralengine.org/res/kernel](https://www.neuralengine.org/res/kernel.html) for further information.
 
-Each function also has a `_classic` variant that preserves the original,
-unoptimized reference implementation with identical signatures and return
-values:
+Each function also has a `_classic` variant that preserves the original
+reference implementation with identical signatures and return values:
 
 ```python
 from ssdensity import sshist_classic, sskernel_classic, ssvkernel_classic
 ```
 
-The optimized versions are the default and recommended for normal use.
+The improved versions are the default and recommended for normal use.
 The `_classic` variants are provided for reference and reproducibility.
 
 ## Benchmark
