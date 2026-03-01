@@ -51,14 +51,13 @@ event counts across bins.
 ### 2. `sskernel` -- fixed-bandwidth kernel density estimation
 
 Estimates a globally optimal Gaussian bandwidth *w* by minimizing the
-cost function derived from the MISE (Shimazaki & Shinomoto, 2010, Eq. 10):
+cost function derived from the MISE (Shimazaki & Shinomoto, 2010):
 
-> *C*<sub>*n*</sub>(*w*) = &int; *&lambda;&#x0302;*<sup>2</sup><sub>*w*</sub>(*t*) d*t* &minus; 2 &int; *&lambda;&#x0302;*<sub>*w*</sub>(*t*) *x*(*t*) d*t* + 2 *k*<sub>*w*</sub>(0) / *n*
+> *C*(*w*) = &sum;<sub>*i,j*</sub> &int; *k*<sub>*w*</sub>(*x* &minus; *x*<sub>*i*</sub>) *k*<sub>*w*</sub>(*x* &minus; *x*<sub>*j*</sub>) d*x* &minus; 2 &sum;<sub>*i* &ne; *j*</sub> *k*<sub>*w*</sub>(*x*<sub>*i*</sub> &minus; *x*<sub>*j*</sub>)
 
-where *&lambda;&#x0302;*<sub>*w*</sub>(*t*) = &int; *x*(*s*) *k*<sub>*w*</sub>(*t* &minus; *s*) d*s* is the kernel rate estimate,
-*x*(*t*) = (1/*n*) &sum; &delta;(*t* &minus; *t*<sub>*i*</sub>) is the sample density,
-*k*<sub>*w*</sub>(*t*) = (2&pi;*w*<sup>2</sup>)<sup>&minus;1/2</sup> exp(&minus;*t*<sup>2</sup>/(2*w*<sup>2</sup>)) is the Gaussian kernel,
-and *n* is the number of observations.
+where *k*<sub>*w*</sub> is a Gaussian kernel with bandwidth *w*. See
+[neuralengine.org/res/kernel](https://www.neuralengine.org/res/kernel.html)
+for further information.
 
 ### 3. `ssvkernel` -- locally adaptive kernel density estimation
 
@@ -68,8 +67,7 @@ minimizing the same *L*<sub>2</sub> cost evaluated within a local window.
 A stiffness parameter *&gamma;* (0 &lt; *&gamma;* &le; 1) controls the
 trade-off between local adaptivity and global smoothness; it is optimized
 via golden-section search. See
-[neuralengine.org/res/kernel](https://www.neuralengine.org/res/kernel.html)
-for an interactive demo.
+[neuralengine.org/res/kernel](https://www.neuralengine.org/res/kernel.html) for further information.
 
 Each function also has a `_classic` variant that preserves the original,
 unoptimized reference implementation with identical signatures and return
@@ -89,9 +87,6 @@ The `_classic` variants are provided for reference and reproducibility.
 Comparison of all three methods on the 15 Marron-Wand densities (1000 samples
 each). See `tests/` for the benchmark notebook.
 
-## Tutorial
-
-Papers and slides are available in the `tutorial/` directory.
 
 ## References
 
