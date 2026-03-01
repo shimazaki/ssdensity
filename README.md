@@ -36,12 +36,40 @@ y, t, optw, gs, C, confb95, yb = ssvkernel(x)
 
 ## Methods
 
-1. **sshist** -- optimal number of histogram bins, minimizing the L2 norm
-   between the histogram and the underlying distribution.
-2. **sskernel** -- kernel density estimation with a single
-   globally-optimized bandwidth.
-3. **ssvkernel** -- kernel density estimation with a locally variable
-   bandwidth.
+### 1. `sshist` -- optimal histogram bin width
+
+Selects the number of bins *N* (equivalently, bin width
+*&Delta;* = (*x*<sub>max</sub> &minus; *x*<sub>min</sub>) / *N*) by
+minimizing the mean integrated squared error (MISE) between the histogram
+and the unknown underlying event rate:
+
+> *C*<sub>*n*</sub>(*&Delta;*) = (2*k&#x0304;* &minus; *v*) / *&Delta;*<sup>2</sup>
+
+where *k&#x0304;* and *v* are the mean and (biased) variance of the
+event counts across bins. 
+
+### 2. `sskernel` -- fixed-bandwidth kernel density estimation
+
+Estimates a globally optimal Gaussian bandwidth *w* by minimizing the
+cost function derived from the MISE (Shimazaki & Shinomoto, 2010, Eq. 10):
+
+> *C*<sub>*n*</sub>(*w*) = &int; *&lambda;&#x0302;*<sup>2</sup><sub>*w*</sub>(*t*) d*t* &minus; 2 &int; *&lambda;&#x0302;*<sub>*w*</sub>(*t*) *x*(*t*) d*t* + 2 *k*<sub>*w*</sub>(0) / *n*
+
+where *&lambda;&#x0302;*<sub>*w*</sub>(*t*) = &int; *x*(*s*) *k*<sub>*w*</sub>(*t* &minus; *s*) d*s* is the kernel rate estimate,
+*x*(*t*) = (1/*n*) &sum; &delta;(*t* &minus; *t*<sub>*i*</sub>) is the sample density,
+*k*<sub>*w*</sub>(*t*) = (2&pi;*w*<sup>2</sup>)<sup>&minus;1/2</sup> exp(&minus;*t*<sup>2</sup>/(2*w*<sup>2</sup>)) is the Gaussian kernel,
+and *n* is the number of observations.
+
+### 3. `ssvkernel` -- locally adaptive kernel density estimation
+
+Extends `sskernel` by allowing the bandwidth to vary as a function of
+location. At each point, the locally optimal bandwidth is selected by
+minimizing the same *L*<sub>2</sub> cost evaluated within a local window.
+A stiffness parameter *&gamma;* (0 &lt; *&gamma;* &le; 1) controls the
+trade-off between local adaptivity and global smoothness; it is optimized
+via golden-section search. See
+[neuralengine.org/res/kernel](https://www.neuralengine.org/res/kernel.html)
+for an interactive demo.
 
 Each function also has a `_classic` variant that preserves the original,
 unoptimized reference implementation with identical signatures and return
