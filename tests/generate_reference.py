@@ -1,14 +1,14 @@
-"""Generate golden reference data for AdaptiveKDE tests.
+"""Generate golden reference data for ssdensity tests.
 
-Run once with: conda run -n basic39 python tests/generate_reference.py
+Run once with: conda run -n py311 python tests/generate_reference.py
 
 Uses the Old Faithful eruption-duration dataset (107 bimodal points).
 """
 import os
 import numpy as np
-from adaptivekde.sshist import sshist
-from adaptivekde.sskernel import sskernel
-from adaptivekde.ssvkernel import ssvkernel
+from ssdensity.sshist import sshist
+from ssdensity.sskernel import sskernel
+from ssdensity.ssvkernel import ssvkernel
 
 # Old Faithful eruption durations (minutes) — 107 observations
 # Source: Azzalini & Bowman (1990), widely used bimodal benchmark

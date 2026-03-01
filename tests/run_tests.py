@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Run all three AdaptiveKDE functions, verify against golden references,
+"""Run all three ssdensity functions, verify against golden references,
 and display timing + output summary.
 
 Usage:
@@ -8,9 +8,9 @@ Usage:
 import os
 import time
 import numpy as np
-from adaptivekde.sshist import sshist
-from adaptivekde.sskernel import sskernel
-from adaptivekde.ssvkernel import ssvkernel
+from ssdensity.sshist import sshist
+from ssdensity.sskernel import sskernel
+from ssdensity.ssvkernel import ssvkernel
 
 # Old Faithful eruption durations (minutes) — 107 observations
 # Source: Azzalini & Bowman (1990)
@@ -143,7 +143,7 @@ def main():
     # --- Timing table ---
     print()
     print("=" * W)
-    print(f"  AdaptiveKDE Summary  (n={len(x)} Old Faithful samples, rtol={RTOL})")
+    print(f"  ssdensity Summary  (n={len(x)} Old Faithful samples, rtol={RTOL})")
     print("=" * W)
     print()
     print("  Timing")

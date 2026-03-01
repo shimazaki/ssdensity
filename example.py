@@ -1,5 +1,5 @@
 """
-AdaptiveKDE example — Old Faithful eruption durations.
+ssdensity example — Old Faithful eruption durations.
 
 Demonstrates all three density estimation methods on the classic
 Old Faithful geyser dataset (107 eruption durations in minutes).
@@ -10,9 +10,9 @@ Usage:
 
 import numpy as np
 import matplotlib.pyplot as plt
-from adaptivekde.sshist import sshist
-from adaptivekde.sskernel import sskernel
-from adaptivekde.ssvkernel import ssvkernel
+from ssdensity.sshist import sshist
+from ssdensity.sskernel import sskernel
+from ssdensity.ssvkernel import ssvkernel
 
 # --- Data: Old Faithful eruption durations (minutes), 107 observations ---
 # Source: Azzalini & Bowman (1990)
@@ -60,7 +60,7 @@ ax.plot(x, np.zeros_like(x), "|", color="k", markersize=6, alpha=0.5)
 
 ax.set_xlabel("Eruption duration (min)")
 ax.set_ylabel("Density")
-ax.set_title("Old Faithful eruption durations — AdaptiveKDE")
+ax.set_title("Old Faithful eruption durations — ssdensity")
 ax.legend()
 fig.tight_layout()
 plt.show()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Benchmark runner for AdaptiveKDE functions.
+"""Benchmark runner for ssdensity functions.
 
 Runs each function N times, records wall/CPU mean+std, and appends results
 to tests/benchmarks.json.
@@ -17,9 +17,9 @@ import time
 
 import numpy as np
 
-from adaptivekde.sshist import sshist
-from adaptivekde.sskernel import sskernel
-from adaptivekde.ssvkernel import ssvkernel
+from ssdensity.sshist import sshist
+from ssdensity.sskernel import sskernel
+from ssdensity.ssvkernel import ssvkernel
 
 # Old Faithful eruption durations (minutes) — 107 observations
 # Source: Azzalini & Bowman (1990)
@@ -104,7 +104,7 @@ def run_benchmarks(n_runs):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Benchmark AdaptiveKDE functions")
+    parser = argparse.ArgumentParser(description="Benchmark ssdensity functions")
     parser.add_argument("--n-runs", type=int, default=10,
                         help="Number of benchmark runs per function (default: 10)")
     args = parser.parse_args()

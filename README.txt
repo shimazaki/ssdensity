@@ -32,11 +32,11 @@ Classic (original) implementations:
 Each function also has a _classic variant that preserves the original, unoptimized
 reference implementation. These have identical signatures and return values:
 
-  from adaptivekde import sshist_classic, sskernel_classic, ssvkernel_classic
+  from ssdensity import sshist_classic, sskernel_classic, ssvkernel_classic
 
 Or import from the classic subpackage:
 
-  from adaptivekde.classic import sshist_classic
+  from ssdensity.classic import sshist_classic
 
 The optimized versions (sshist, sskernel, ssvkernel) are the default and recommended
 for normal use. The _classic variants are provided for reference and reproducibility.
@@ -48,7 +48,7 @@ Requirements:
 Tested on Python 3.9 (NumPy 1.26) and Python 3.11 (NumPy 2.4).
 
 Installation:
-  pip install adaptivekde
+  pip install ssdensity
 
 Or from source:
   pip install -e .

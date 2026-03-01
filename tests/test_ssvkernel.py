@@ -2,7 +2,7 @@ import os
 import time
 import numpy as np
 import pytest
-from adaptivekde.ssvkernel import ssvkernel
+from ssdensity.ssvkernel import ssvkernel
 
 
 class TestSsvkernelGolden:

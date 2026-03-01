@@ -2,7 +2,7 @@ import os
 import time
 import numpy as np
 import pytest
-from adaptivekde.sshist import sshist
+from ssdensity.sshist import sshist
 
 
 class TestSshistGolden:

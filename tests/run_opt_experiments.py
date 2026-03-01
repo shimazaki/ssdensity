@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Optimization experiment benchmark harness for AdaptiveKDE.
+"""Optimization experiment benchmark harness for ssdensity.
 
 Usage:
     python tests/run_opt_experiments.py --experiment baseline
@@ -15,9 +15,9 @@ import time
 
 import numpy as np
 
-from adaptivekde.sshist import sshist
-from adaptivekde.sskernel import sskernel
-from adaptivekde.ssvkernel import ssvkernel
+from ssdensity.sshist import sshist
+from ssdensity.sskernel import sskernel
+from ssdensity.ssvkernel import ssvkernel
 
 # --- Test datasets ---
 # 107-point Old Faithful (Azzalini & Bowman 1990)
@@ -126,7 +126,7 @@ def print_report():
             break
 
     print("\n" + "=" * 90)
-    print("  AdaptiveKDE Optimization Experiment Results (CPU time, median of 20 runs)")
+    print("  ssdensity Optimization Experiment Results (CPU time, median of 20 runs)")
     print("=" * 90)
 
     for ds_name in DATASETS:
@@ -159,7 +159,7 @@ def print_report():
 
 
 def main():
-    parser = argparse.ArgumentParser(description="AdaptiveKDE optimization experiments")
+    parser = argparse.ArgumentParser(description="ssdensity optimization experiments")
     parser.add_argument("--experiment", type=str, help="Experiment label")
     parser.add_argument("--n-runs", type=int, default=N_RUNS_DEFAULT)
     parser.add_argument("--report", action="store_true", help="Print comparison table")

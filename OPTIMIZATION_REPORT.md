@@ -1,4 +1,4 @@
-# AdaptiveKDE Performance Optimization Report
+# ssdensity Performance Optimization Report
 
 Branch: `opt-experiments`
 Date: February 2026
