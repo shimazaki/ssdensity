@@ -46,7 +46,9 @@ and the unknown underlying event rate:
 > *C*<sub>*n*</sub>(*&Delta;*) = (2*k&#x0304;* &minus; *v*) / *&Delta;*<sup>2</sup>
 
 where *k&#x0304;* and *v* are the mean and (biased) variance of the
-event counts across bins. 
+event counts across bins. See
+[neuralengine.org/res/histogram](https://www.neuralengine.org/res/histogram.html)
+for further information.
 
 ### 2. `sskernel` -- fixed-bandwidth kernel density estimation
 
