@@ -6,7 +6,7 @@ except ImportError:
     from numpy.fft import rfft, irfft, rfftfreq
 
 
-def sskernel(x, tin=None, W=None, nbs=1000):
+def sskernel(x, tin=None, W=None, bootstrap=0):
     """
     Generates a kernel density estimate with globally-optimized bandwidth.
 
@@ -25,9 +25,9 @@ def sskernel(x, tin=None, W=None, nbs=1000):
     W : array_like, optional
         The kernel bandwidths to use in optimization. Should not be chosen
         smaller than the sampling resolution of 'x'.
-    nbs : int, optional
-        The number of bootstrap samples to use in estimating the [0.05, 0.95]
-        confidence interval of the output 'y'
+    bootstrap : bool or int, optional
+        Number of bootstrap samples for the [0.05, 0.95] confidence interval.
+        False or 0 disables bootstrap (default). True uses 1000 samples.
 
     Returns
     -------
@@ -141,38 +141,47 @@ def sskernel(x, tin=None, W=None, nbs=1000):
         W = W[0:k]
 
     # estimate confidence intervals by bootstrapping
-    nbs = np.asarray(nbs)
-    L = len(t)
-    thist = np.concatenate((t, (t[-1]+dt)[np.newaxis]))
-    bins = thist - dt / 2
+    nbs = bootstrap
+    if nbs is True:
+        nbs = 1000
+    elif nbs is False:
+        nbs = 0
+    nbs = int(nbs)
+    if nbs > 0:
+        L = len(t)
+        thist = np.concatenate((t, (t[-1]+dt)[np.newaxis]))
+        bins = thist - dt / 2
 
-    # generate all bootstrap histograms
-    y_all = np.zeros((nbs, L))
-    for i in range(nbs):
-        idx = np.random.randint(0, len(x_ab), len(x_ab))
-        xb = x_ab[idx]
-        y_all[i, :] = np.histogram(xb, bins)[0] / dt / N
+        # generate all bootstrap histograms
+        y_all = np.zeros((nbs, L))
+        for i in range(nbs):
+            idx = np.random.randint(0, len(x_ab), len(x_ab))
+            xb = x_ab[idx]
+            y_all[i, :] = np.histogram(xb, bins)[0] / dt / N
 
-    # batched FFT convolution (single 2D rfft instead of nbs individual calls)
-    w = optw / dt
-    n = int(2 ** np.ceil(np.log2(L + 3 * w)))
-    Y_all = rfft(y_all, n, axis=1)
-    if n not in _rfreq_cache:
-        _rfreq_cache[n] = rfftfreq(n)
-    f = _rfreq_cache[n]
-    K = np.exp(-0.5 * (w * 2 * np.pi * f)**2)
-    yb_conv = irfft(Y_all * K[np.newaxis, :], n, axis=1)[:, :L]
+        # batched FFT convolution (single 2D rfft instead of nbs individual calls)
+        w = optw / dt
+        n = int(2 ** np.ceil(np.log2(L + 3 * w)))
+        Y_all = rfft(y_all, n, axis=1)
+        if n not in _rfreq_cache:
+            _rfreq_cache[n] = rfftfreq(n)
+        f = _rfreq_cache[n]
+        K = np.exp(-0.5 * (w * 2 * np.pi * f)**2)
+        yb_conv = irfft(Y_all * K[np.newaxis, :], n, axis=1)[:, :L]
 
-    # normalize and interpolate
-    norms = np.sum(yb_conv * dt, axis=1, keepdims=True)
-    yb_conv = yb_conv / norms
-    yb = np.zeros((nbs, len(tin)))
-    for i in range(nbs):
-        yb[i, :] = np.interp(tin, t, yb_conv[i, :])
-    ybsort = np.sort(yb, axis=0)
-    y95b = ybsort[int(np.floor(0.05 * nbs)), :]
-    y95u = ybsort[int(np.floor(0.95 * nbs)), :]
-    confb95 = np.concatenate((y95b[np.newaxis], y95u[np.newaxis]), axis=0)
+        # normalize and interpolate
+        norms = np.sum(yb_conv * dt, axis=1, keepdims=True)
+        yb_conv = yb_conv / norms
+        yb = np.zeros((nbs, len(tin)))
+        for i in range(nbs):
+            yb[i, :] = np.interp(tin, t, yb_conv[i, :])
+        ybsort = np.sort(yb, axis=0)
+        y95b = ybsort[int(np.floor(0.05 * nbs)), :]
+        y95u = ybsort[int(np.floor(0.95 * nbs)), :]
+        confb95 = np.concatenate((y95b[np.newaxis], y95u[np.newaxis]), axis=0)
+    else:
+        yb = np.zeros((0, len(tin)))
+        confb95 = np.full((2, len(tin)), np.nan)
 
     # return outputs
     y = np.interp(tin, t, y)

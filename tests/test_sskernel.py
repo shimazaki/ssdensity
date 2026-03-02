@@ -12,7 +12,7 @@ class TestSskernelGolden:
         np.random.seed(0)
         t0_wall = time.perf_counter()
         t0_cpu = time.process_time()
-        y, t, optw, W, C, confb95, yb = sskernel(faithful, nbs=200)
+        y, t, optw, W, C, confb95, yb = sskernel(faithful, bootstrap=200)
         wall = time.perf_counter() - t0_wall
         cpu = time.process_time() - t0_cpu
         print(f"\n  sskernel: {wall:.4f} s (cpu: {cpu:.4f} s)")
@@ -34,7 +34,7 @@ class TestSskernelProperties:
     def run_sskernel(self, faithful):
         np.random.seed(0)
         self.y, self.t, self.optw, self.W, self.C, self.confb95, self.yb = \
-            sskernel(faithful, nbs=200)
+            sskernel(faithful, bootstrap=200)
 
     def test_density_nonnegative(self):
         assert np.all(self.y >= 0)

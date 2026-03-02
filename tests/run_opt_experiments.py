@@ -80,8 +80,8 @@ def run_experiment(n_runs):
     results = {}
     funcs = [
         ("sshist", lambda x: sshist(x), None),
-        ("sskernel", lambda x: sskernel(x, nbs=200), 0),
-        ("ssvkernel", lambda x: ssvkernel(x, nbs=50), 0),
+        ("sskernel", lambda x: sskernel(x, bootstrap=200), 0),
+        ("ssvkernel", lambda x: ssvkernel(x, bootstrap=50), 0),
     ]
     for ds_name, ds in DATASETS.items():
         results[ds_name] = {}

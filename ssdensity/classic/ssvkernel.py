@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def ssvkernel_classic(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
+def ssvkernel_classic(x, tin=None, M=80, bootstrap=0, WinFunc='Boxcar'):
     """
     Generates a locally adaptive kernel-density estimate for one-dimensional
     data.
@@ -32,9 +32,9 @@ def ssvkernel_classic(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
         the output 'y'. Default value = None.
     M : int, optional
         The number of window sizes to evaluate. Default value = 80.
-    nbs : int, optional
-        The number of bootstrap samples to use in estimating the [0.05, 0.95]
-        confidence interval of the output 'y'.
+    bootstrap : bool or int, optional
+        Number of bootstrap samples for the [0.05, 0.95] confidence interval.
+        False or 0 disables bootstrap (default). True uses 100 samples.
     WinFunc : string, optional
         The type of window function to use in estimating local bandwidth.
         Choose from one of 'Boxcar', 'Laplace', 'Cauchy' and 'Gauss'. Default
@@ -160,26 +160,35 @@ def ssvkernel_classic(x, tin=None, M=80, nbs=100, WinFunc='Boxcar'):
     C = C[0:k]
 
     # estimate confidence intervals by bootstrapping
-    nbs = np.asarray(nbs)
-    yb = np.zeros((nbs, tin.size))
-    for i in range(nbs):
-        Nb = np.random.poisson(lam=N)
-        idx = np.random.randint(0, N, Nb)
-        xb = x_ab[idx]
-        thist = np.concatenate((t, (t[-1]+dt)[np.newaxis]))
-        y_histb = np.histogram(xb, thist - dt / 2)[0]
-        idx = y_histb.nonzero()
-        y_histb_nz = y_histb[idx]
-        t_nz = t[idx]
-        yb_buf = np.zeros((L, ))
-        for k in range(L):
-            yb_buf[k] = np.sum(y_histb_nz * Gauss(t[k] - t_nz, optw[k])) / Nb
-        yb_buf = yb_buf / np.sum(yb_buf * dt)
-        yb[i, :] = np.interp(tin, t, yb_buf)
-    ybsort = np.sort(yb, axis=0)
-    y95b = ybsort[int(np.floor(0.05 * nbs)), :]
-    y95u = ybsort[int(np.floor(0.95 * nbs)), :]
-    confb95 = np.concatenate((y95b[np.newaxis], y95u[np.newaxis]), axis=0)
+    nbs = bootstrap
+    if nbs is True:
+        nbs = 100
+    elif nbs is False:
+        nbs = 0
+    nbs = int(nbs)
+    if nbs > 0:
+        yb = np.zeros((nbs, tin.size))
+        for i in range(nbs):
+            Nb = np.random.poisson(lam=N)
+            idx = np.random.randint(0, N, Nb)
+            xb = x_ab[idx]
+            thist = np.concatenate((t, (t[-1]+dt)[np.newaxis]))
+            y_histb = np.histogram(xb, thist - dt / 2)[0]
+            idx = y_histb.nonzero()
+            y_histb_nz = y_histb[idx]
+            t_nz = t[idx]
+            yb_buf = np.zeros((L, ))
+            for k in range(L):
+                yb_buf[k] = np.sum(y_histb_nz * Gauss(t[k] - t_nz, optw[k])) / Nb
+            yb_buf = yb_buf / np.sum(yb_buf * dt)
+            yb[i, :] = np.interp(tin, t, yb_buf)
+        ybsort = np.sort(yb, axis=0)
+        y95b = ybsort[int(np.floor(0.05 * nbs)), :]
+        y95u = ybsort[int(np.floor(0.95 * nbs)), :]
+        confb95 = np.concatenate((y95b[np.newaxis], y95u[np.newaxis]), axis=0)
+    else:
+        yb = np.zeros((0, tin.size))
+        confb95 = np.full((2, tin.size), np.nan)
 
     # return outputs
     y = np.interp(tin, t, yopt)

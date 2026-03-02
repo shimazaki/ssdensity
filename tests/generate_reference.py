@@ -43,10 +43,10 @@ np.savez(
 )
 print(f"  optN={optN}, optD={optD:.6f}, len(edges)={len(edges)}, len(C)={len(C)}")
 
-# --- sskernel (seeded bootstrap, nbs=200) ---
+# --- sskernel (seeded bootstrap, bootstrap=200) ---
 print("Generating sskernel reference...")
 np.random.seed(0)
-y, t, optw, W, C, confb95, yb = sskernel(x, nbs=200)
+y, t, optw, W, C, confb95, yb = sskernel(x, bootstrap=200)
 np.savez(
     os.path.join(OUT_DIR, "sskernel_ref.npz"),
     y=y,
@@ -59,10 +59,10 @@ np.savez(
 )
 print(f"  optw={optw:.6f}, len(y)={len(y)}, yb.shape={yb.shape}")
 
-# --- ssvkernel (seeded bootstrap, nbs=50) ---
+# --- ssvkernel (seeded bootstrap, bootstrap=50) ---
 print("Generating ssvkernel reference...")
 np.random.seed(0)
-y, t, optw, gs, C, confb95, yb = ssvkernel(x, nbs=50)
+y, t, optw, gs, C, confb95, yb = ssvkernel(x, bootstrap=50)
 np.savez(
     os.path.join(OUT_DIR, "ssvkernel_ref.npz"),
     y=y,

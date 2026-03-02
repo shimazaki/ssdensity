@@ -71,7 +71,7 @@ def run_sskernel(x):
     np.random.seed(0)
     t0_wall = time.perf_counter()
     t0_cpu = time.process_time()
-    y, t, optw, W, C, confb95, yb = sskernel(x, nbs=200)
+    y, t, optw, W, C, confb95, yb = sskernel(x, bootstrap=200)
     wall = time.perf_counter() - t0_wall
     cpu = time.process_time() - t0_cpu
 
@@ -100,7 +100,7 @@ def run_ssvkernel(x):
     np.random.seed(0)
     t0_wall = time.perf_counter()
     t0_cpu = time.process_time()
-    y, t, optw, gs, C, confb95, yb = ssvkernel(x, nbs=50)
+    y, t, optw, gs, C, confb95, yb = ssvkernel(x, bootstrap=50)
     wall = time.perf_counter() - t0_wall
     cpu = time.process_time() - t0_cpu
 

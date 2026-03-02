@@ -12,7 +12,7 @@ class TestSsvkernelGolden:
         np.random.seed(0)
         t0_wall = time.perf_counter()
         t0_cpu = time.process_time()
-        y, t, optw, gs, C, confb95, yb = ssvkernel(faithful, nbs=50)
+        y, t, optw, gs, C, confb95, yb = ssvkernel(faithful, bootstrap=50)
         wall = time.perf_counter() - t0_wall
         cpu = time.process_time() - t0_cpu
         print(f"\n  ssvkernel: {wall:.4f} s (cpu: {cpu:.4f} s)")
@@ -34,7 +34,7 @@ class TestSsvkernelProperties:
     def run_ssvkernel(self, faithful):
         np.random.seed(0)
         self.y, self.t, self.optw, self.gs, self.C, self.confb95, self.yb = \
-            ssvkernel(faithful, nbs=50)
+            ssvkernel(faithful, bootstrap=50)
 
     def test_density_nonnegative(self):
         assert np.all(self.y >= 0)

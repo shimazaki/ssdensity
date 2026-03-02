@@ -55,7 +55,7 @@ def bench_sskernel(x):
     np.random.seed(0)
     t0_wall = time.perf_counter()
     t0_cpu = time.process_time()
-    sskernel(x, nbs=200)
+    sskernel(x, bootstrap=200)
     wall = time.perf_counter() - t0_wall
     cpu = time.process_time() - t0_cpu
     return wall, cpu
@@ -66,7 +66,7 @@ def bench_ssvkernel(x):
     np.random.seed(0)
     t0_wall = time.perf_counter()
     t0_cpu = time.process_time()
-    ssvkernel(x, nbs=50)
+    ssvkernel(x, bootstrap=50)
     wall = time.perf_counter() - t0_wall
     cpu = time.process_time() - t0_cpu
     return wall, cpu

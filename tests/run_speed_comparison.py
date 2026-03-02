@@ -81,11 +81,11 @@ def bench_sshist(x, t_grid):
 
 
 def bench_sskernel(x, t_grid):
-    sskernel(x, tin=t_grid, nbs=1)
+    sskernel(x, tin=t_grid, bootstrap=0)
 
 
 def bench_ssvkernel(x, t_grid):
-    ssvkernel(x, tin=t_grid, nbs=1)
+    ssvkernel(x, tin=t_grid, bootstrap=0)
 
 
 def bench_np_histogram(x, t_grid):
@@ -226,7 +226,7 @@ def main():
     print()
     print(f"  Grid size: {N_GRID} points (KDE methods)")
     print(f"  sshist: bins selected by MISE cost optimization")
-    print(f"  sskernel/ssvkernel: nbs=1 (minimal bootstrap)")
+    print(f"  sskernel/ssvkernel: bootstrap=0 (no bootstrap)")
     print()
 
     return 0
