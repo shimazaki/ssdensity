@@ -83,7 +83,7 @@ The `_classic` variants are provided for reference and reproducibility.
 
 ## Benchmark
 
-![Marron-Wand benchmark](tests/compare_methods_optimized.png)
+![Marron-Wand benchmark](tests/marron_wand/compare_methods_optimized.png)
 
 Comparison of all three methods on the 15 Marron-Wand densities (1000 samples
 each). See `tests/` for the benchmark notebook.
@@ -108,7 +108,7 @@ Python 3.11, NumPy 2.4, 256-point evaluation grid:
 rule-of-thumb methods. `scipy.gaussian_kde` is notably slow because it
 evaluates the full kernel sum without FFT acceleration.
 sskernel/ssvkernel run with `bootstrap=0` (default, no bootstrap).
-Reproduce: `python tests/run_speed_comparison.py`
+Reproduce: `python tests/speed_comparison/run_speed_comparison.py`
 
 
 ## References

@@ -690,3 +690,118 @@ The L = 1000 cap is the key scaling boundary. Below it, `ssvkernel` scales
 quadratically; above it, all functions scale linearly in n. For applications
 with very large n, the bottleneck shifts from kernel evaluation to bootstrap
 resampling (generating histograms from resampled data).
+
+---
+
+## 11. JAX Evaluation
+
+**Date**: March 2026
+**Environment**: Python 3.11.14, NumPy 2.4.2, Numba 0.64.0 on carnot
+
+### 11.1 Motivation
+
+JAX offers JIT compilation, automatic vectorization (`vmap`), and GPU
+acceleration. This section evaluates whether porting from NumPy to JAX would
+yield further performance improvements beyond the optimizations in Sections 3–9.
+
+### 11.2 Profiling Results (Current Optimized Code)
+
+Profiled with bimodal mixture data across sample sizes. Timings are wall-clock,
+single run after warmup.
+
+**Core algorithm (no bootstrap):**
+
+| n | sshist | sskernel | ssvkernel |
+|---:|---:|---:|---:|
+| 100 | 0.182s | 0.003s | 0.308s |
+| 1,000 | 0.130s | 0.002s | 0.371s |
+| 5,000 | 0.213s | 0.002s | 0.457s |
+| 10,000 | 0.235s | 0.002s | 0.491s |
+
+**With bootstrap:**
+
+| n | sskernel (bs=200) | ssvkernel (bs=50) |
+|---:|---:|---:|
+| 1,000 | 0.022s | 0.496s |
+| 5,000 | 0.041s | 0.773s |
+| 10,000 | 0.062s | 0.857s |
+
+**ssvkernel component breakdown (n=5000, L=1000, no bootstrap):**
+
+| Component | Time | % of total |
+|---|---:|---:|
+| CostFunction × ~30 (golden section) | ~0.420s | **63%** |
+| Optimal bandwidth (batched FFT) | 0.122s | 18% |
+| Local cost (M=80 FFT convolutions) | 0.006s | 1% |
+| Setup (histogram, sort) | 0.000s | <1% |
+
+cProfile confirms `CostFunction` (called 25 times) accounts for 64% of
+`ssvkernel` runtime, with 0.215s spent in its body — the L×L matrix operations
+(Nadaraya-Watson kernel regression + balloon estimator).
+
+### 11.3 Why JAX Would Not Help
+
+**1. L is capped at 1000 — too small for GPU.**
+
+The evaluation grid size is hard-capped:
+
+```python
+L = int(min(np.ceil(T / dt_samp), 1e3))
+```
+
+The largest matrices in `CostFunction` are L×L = 1000×1000 (~8 MB). GPU kernel
+launch overhead and host↔device transfer latency dominate at this size. On a
+V100S, a 1000×1000 `exp()` + multiply + sum takes ~0.1ms in compute but ~0.5ms
+in transfer — a net loss vs. CPU.
+
+L > 1000 only occurs when the user provides a custom `tin` argument with more
+than 1000 points *and* `dt_samp ≤ min(diff(tin))`. This is not the normal use
+case.
+
+**2. The golden section search is inherently sequential.**
+
+`CostFunction` is called ~25–30 times in a sequential golden section search
+where each iteration's result determines the next evaluation point. JAX cannot
+parallelize across these iterations — `jax.lax.while_loop` would JIT the body
+but each call still waits for the previous one.
+
+**3. `sshist` is already Numba JIT'd.**
+
+At 0.004s (n=107) the Numba-compiled kernel has no headroom. The workload
+(sequential `searchsorted` over variable bin counts) is poorly suited for GPU
+SIMD execution.
+
+**4. `sskernel` is already 2ms.**
+
+No meaningful optimization target.
+
+**5. Bootstrap vectorization via `vmap` — limited by `np.histogram`.**
+
+JAX has no native `np.histogram`. The bootstrap inner loop in `ssvkernel`
+(L×nnz kernel evaluation) could be `vmap`'d, but each iteration first needs a
+histogram of resampled data, which would require a custom scatter-add
+implementation in JAX.
+
+**6. Practical costs.**
+
+| Concern | Impact |
+|---|---|
+| JAX requires Python ≥ 3.9 | OK (py311 available) |
+| JAX PRNG model (explicit keys) | All bootstrap code must be rewritten |
+| No `np.histogram` in JAX | Custom implementation needed |
+| First-call JIT compilation | Adds 1–5s latency on first invocation |
+| Additional dependency (~500 MB) | Significant install footprint |
+| Validation effort | All 18 golden tests must pass at rtol=1e-10 |
+
+### 11.4 Conclusion
+
+The current bottleneck — `ssvkernel`'s `CostFunction` called ~25 times
+sequentially on 1000×1000 matrices — is not a workload that benefits from JAX
+or GPU acceleration. The matrices are too small for GPU transfer overhead to
+pay off, and the sequential golden section search prevents inter-call
+parallelism.
+
+The optimized NumPy + Numba implementation is already near-optimal for this
+problem structure. Further speedups would require **algorithmic changes**
+(e.g., reducing the number of CostFunction evaluations or lowering the L cap),
+not a framework change.

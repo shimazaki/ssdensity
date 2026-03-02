@@ -29,7 +29,7 @@ OLD_FAITHFUL = np.array([
 ])
 
 RTOL = 1e-10
-REF_DIR = os.path.join(os.path.dirname(__file__), "reference_data")
+REF_DIR = os.path.join(os.path.dirname(__file__), "unit", "reference_data")
 W = 70  # table width
 
 
