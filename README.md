@@ -88,6 +88,28 @@ The `_classic` variants are provided for reference and reproducibility.
 Comparison of all three methods on the 15 Marron-Wand densities (1000 samples
 each). See `tests/` for the benchmark notebook.
 
+### Speed comparison
+
+Median CPU time on bimodal synthetic data (0.5 N(-1,1) + 0.5 N(1,1)),
+Python 3.11, NumPy 2.4, 256-point evaluation grid:
+
+| Method | n=1,000 | n=10,000 | n=100,000 |
+|---|---:|---:|---:|
+| **sskernel** | 1.6 ms | 1.9 ms | 6.4 ms |
+| **ssvkernel** | 47.9 ms | 49.1 ms | 56.0 ms |
+| **sshist** | 123.2 ms | 233.1 ms | 297.1 ms |
+| np.histogram (Scott) | 0.1 ms | 0.2 ms | 1.7 ms |
+| KDEpy FFTKDE (Silverman) | 0.8 ms | 0.9 ms | 2.5 ms |
+| statsmodels KDE (normal ref) | 2.8 ms | 25.6 ms | 505.1 ms |
+| sklearn KernelDensity (Scott) | 8.1 ms | 61.7 ms | 543.2 ms |
+| scipy.gaussian_kde (Scott) | 257.2 ms | 3.07 s | 12.85 s |
+
+`sskernel` uses data-driven MISE optimization yet runs competitively with
+rule-of-thumb methods. `scipy.gaussian_kde` is notably slow because it
+evaluates the full kernel sum without FFT acceleration.
+sskernel/ssvkernel run with `nbs=1` (minimal bootstrap).
+Reproduce: `python tests/run_speed_comparison.py`
+
 
 ## References
 
