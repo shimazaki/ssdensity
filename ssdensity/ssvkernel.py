@@ -5,6 +5,139 @@ try:
 except ImportError:
     from numpy.fft import rfft, irfft, rfftfreq
 
+try:
+    from numba import njit, prange
+    _HAS_NUMBA = True
+except ImportError:
+    _HAS_NUMBA = False
+
+
+def _make_numba_costfunction_kernels():
+    """Factory that returns 4 numba-compiled parallel kernel functions."""
+
+    _inv_sqrt_2pi = 1.0 / np.sqrt(2.0 * np.pi)
+    _sqrt_12 = np.sqrt(12.0)
+    _sqrt_2 = np.sqrt(2.0)
+
+    @njit(parallel=True)
+    def _nw_boxcar(t, t_nz, optwv, sigma, optwp, y_hist_nz, dt, N, yv):
+        L = t.shape[0]
+        nnz = t_nz.shape[0]
+        # Nadaraya-Watson kernel regression (Boxcar)
+        for i in prange(L):
+            num = 0.0
+            den = 0.0
+            for j in range(L):
+                a_j = _sqrt_12 * sigma[j]
+                d = t[i] - t[j]
+                if abs(d) <= a_j / 2.0:
+                    z = 1.0 / a_j
+                else:
+                    z = 0.0
+                num += optwv[j] * z
+                den += z
+            optwp[i] = num / den
+        # Balloon estimator (always Gauss)
+        for i in prange(L):
+            inv_w = 1.0 / optwp[i]
+            coeff = _inv_sqrt_2pi * inv_w
+            inv_2w2 = 0.5 * inv_w * inv_w
+            s = 0.0
+            for j in range(nnz):
+                d = t[i] - t_nz[j]
+                s += y_hist_nz[j] * coeff * np.exp(-d * d * inv_2w2)
+            yv[i] = s * dt
+
+    @njit(parallel=True)
+    def _nw_gauss(t, t_nz, optwv, sigma, optwp, y_hist_nz, dt, N, yv):
+        L = t.shape[0]
+        nnz = t_nz.shape[0]
+        # Nadaraya-Watson kernel regression (Gauss)
+        for i in prange(L):
+            num = 0.0
+            den = 0.0
+            for j in range(L):
+                inv_s = 1.0 / sigma[j]
+                coeff = _inv_sqrt_2pi * inv_s
+                inv_2s2 = 0.5 * inv_s * inv_s
+                d = t[i] - t[j]
+                z = coeff * np.exp(-d * d * inv_2s2)
+                num += optwv[j] * z
+                den += z
+            optwp[i] = num / den
+        # Balloon estimator (always Gauss)
+        for i in prange(L):
+            inv_w = 1.0 / optwp[i]
+            coeff = _inv_sqrt_2pi * inv_w
+            inv_2w2 = 0.5 * inv_w * inv_w
+            s = 0.0
+            for j in range(nnz):
+                d = t[i] - t_nz[j]
+                s += y_hist_nz[j] * coeff * np.exp(-d * d * inv_2w2)
+            yv[i] = s * dt
+
+    @njit(parallel=True)
+    def _nw_laplace(t, t_nz, optwv, sigma, optwp, y_hist_nz, dt, N, yv):
+        L = t.shape[0]
+        nnz = t_nz.shape[0]
+        # Nadaraya-Watson kernel regression (Laplace)
+        for i in prange(L):
+            num = 0.0
+            den = 0.0
+            for j in range(L):
+                inv_s = 1.0 / sigma[j]
+                coeff = inv_s / _sqrt_2
+                scale = _sqrt_2 * inv_s
+                d = t[i] - t[j]
+                z = coeff * np.exp(-scale * abs(d))
+                num += optwv[j] * z
+                den += z
+            optwp[i] = num / den
+        # Balloon estimator (always Gauss)
+        for i in prange(L):
+            inv_w = 1.0 / optwp[i]
+            coeff = _inv_sqrt_2pi * inv_w
+            inv_2w2 = 0.5 * inv_w * inv_w
+            s = 0.0
+            for j in range(nnz):
+                d = t[i] - t_nz[j]
+                s += y_hist_nz[j] * coeff * np.exp(-d * d * inv_2w2)
+            yv[i] = s * dt
+
+    @njit(parallel=True)
+    def _nw_cauchy(t, t_nz, optwv, sigma, optwp, y_hist_nz, dt, N, yv):
+        L = t.shape[0]
+        nnz = t_nz.shape[0]
+        # Nadaraya-Watson kernel regression (Cauchy)
+        for i in prange(L):
+            num = 0.0
+            den = 0.0
+            for j in range(L):
+                inv_s = 1.0 / sigma[j]
+                coeff = inv_s / np.pi
+                d = (t[i] - t[j]) * inv_s
+                z = coeff / (1.0 + d * d)
+                num += optwv[j] * z
+                den += z
+            optwp[i] = num / den
+        # Balloon estimator (always Gauss)
+        for i in prange(L):
+            inv_w = 1.0 / optwp[i]
+            coeff = _inv_sqrt_2pi * inv_w
+            inv_2w2 = 0.5 * inv_w * inv_w
+            s = 0.0
+            for j in range(nnz):
+                d = t[i] - t_nz[j]
+                s += y_hist_nz[j] * coeff * np.exp(-d * d * inv_2w2)
+            yv[i] = s * dt
+
+    return _nw_boxcar, _nw_gauss, _nw_laplace, _nw_cauchy
+
+
+if _HAS_NUMBA:
+    _nw_boxcar, _nw_gauss, _nw_laplace, _nw_cauchy = (
+        _make_numba_costfunction_kernels()
+    )
 
 
 def ssvkernel(x, tin=None, M=80, bootstrap=0, WinFunc='Boxcar'):
@@ -152,14 +285,16 @@ def ssvkernel(x, tin=None, M=80, bootstrap=0, WinFunc='Boxcar'):
     # pre-compute invariants for CostFunction (reused ~30 times)
     idx_nz = y_hist.nonzero()
     precomp = {
-        't_diff': t[:, np.newaxis] - t[np.newaxis, :],           # (L, L)
-        't_diff_nz': t[:, np.newaxis] - t[idx_nz][np.newaxis, :], # (L, nnz)
         'gs_all': optws / W[:, np.newaxis],                       # (M, L)
         'y_hist_nz': y_hist[idx_nz],
+        't_nz': t[idx_nz],
         'WIN_min': np.min(W),
         'WIN_max': np.max(W),
         'row_idx': np.arange(M)[:, np.newaxis],
     }
+    if not _HAS_NUMBA:
+        precomp['t_diff'] = t[:, np.newaxis] - t[np.newaxis, :]       # (L, L)
+        precomp['t_diff_nz'] = t[:, np.newaxis] - t[idx_nz][np.newaxis, :]  # (L, nnz)
     precomp['gs_max'] = np.max(precomp['gs_all'], axis=0)
     precomp['gs_min'] = np.min(precomp['gs_all'], axis=0)
 
@@ -256,8 +391,6 @@ def CostFunction(y_hist, N, t, dt, optws, WIN, WinFunc, g, precomp=None):
         gs_all = precomp['gs_all']
         gs_max = precomp['gs_max']
         gs_min = precomp['gs_min']
-        t_diff = precomp['t_diff']
-        t_diff_nz = precomp['t_diff_nz']
         y_hist_nz = precomp['y_hist_nz']
         WIN_min = precomp['WIN_min']
         WIN_max = precomp['WIN_max']
@@ -267,9 +400,7 @@ def CostFunction(y_hist, N, t, dt, optws, WIN, WinFunc, g, precomp=None):
         gs_all = optws / WIN[:, np.newaxis]
         gs_max = np.max(gs_all, axis=0)
         gs_min = np.min(gs_all, axis=0)
-        t_diff = t[:, np.newaxis] - t[np.newaxis, :]
         idx_nz = y_hist.nonzero()
-        t_diff_nz = t[:, np.newaxis] - t[idx_nz][np.newaxis, :]
         y_hist_nz = y_hist[idx_nz]
         WIN_min = np.min(WIN)
         WIN_max = np.max(WIN)
@@ -285,30 +416,54 @@ def CostFunction(y_hist, N, t, dt, optws, WIN, WinFunc, g, precomp=None):
         max_idx = np.max(np.where(ge_mask, row_idx, -1), axis=0)
         optwv[mask_mid] = g * WIN[max_idx]
 
-    # --- vectorized Nadaraya-Watson kernel regression ---
-    sigma = optwv / g
+    if _HAS_NUMBA:
+        # --- numba parallel path ---
+        sigma = optwv / g
+        optwp = np.empty(L)
+        yv = np.empty(L)
+        t_nz = precomp['t_nz'] if precomp is not None else t[y_hist.nonzero()]
+        if WinFunc == 'Boxcar':
+            _nw_boxcar(t, t_nz, optwv, sigma, optwp, y_hist_nz, dt, N, yv)
+        elif WinFunc == 'Gauss':
+            _nw_gauss(t, t_nz, optwv, sigma, optwp, y_hist_nz, dt, N, yv)
+        elif WinFunc == 'Laplace':
+            _nw_laplace(t, t_nz, optwv, sigma, optwp, y_hist_nz, dt, N, yv)
+        elif WinFunc == 'Cauchy':
+            _nw_cauchy(t, t_nz, optwv, sigma, optwp, y_hist_nz, dt, N, yv)
+        yv = yv * N / np.sum(yv * dt)
+    else:
+        # --- NumPy broadcasting path ---
+        if precomp is not None:
+            t_diff = precomp['t_diff']
+            t_diff_nz = precomp['t_diff_nz']
+        else:
+            t_diff = t[:, np.newaxis] - t[np.newaxis, :]
+            idx_nz = y_hist.nonzero()
+            t_diff_nz = t[:, np.newaxis] - t[idx_nz][np.newaxis, :]
 
-    if WinFunc == 'Boxcar':
-        a = 12**0.5 * sigma
-        Z = np.where(np.abs(t_diff) <= a[np.newaxis, :] / 2,
-                     1 / a[np.newaxis, :], 0)
-    elif WinFunc == 'Laplace':
-        Z = (1 / 2**0.5 / sigma[np.newaxis, :]
-             * np.exp(-(2**0.5) / sigma[np.newaxis, :] * np.abs(t_diff)))
-    elif WinFunc == 'Cauchy':
-        Z = 1 / (np.pi * sigma[np.newaxis, :]
-                 * (1 + (t_diff / sigma[np.newaxis, :])**2))
-    else:  # Gauss
-        Z = (1 / (2 * np.pi)**0.5 / sigma[np.newaxis, :]
-             * np.exp(-t_diff**2 / 2 / sigma[np.newaxis, :]**2))
+        sigma = optwv / g
 
-    optwp = np.sum(optwv[np.newaxis, :] * Z, axis=1) / np.sum(Z, axis=1)
+        if WinFunc == 'Boxcar':
+            a = 12**0.5 * sigma
+            Z = np.where(np.abs(t_diff) <= a[np.newaxis, :] / 2,
+                         1 / a[np.newaxis, :], 0)
+        elif WinFunc == 'Laplace':
+            Z = (1 / 2**0.5 / sigma[np.newaxis, :]
+                 * np.exp(-(2**0.5) / sigma[np.newaxis, :] * np.abs(t_diff)))
+        elif WinFunc == 'Cauchy':
+            Z = 1 / (np.pi * sigma[np.newaxis, :]
+                     * (1 + (t_diff / sigma[np.newaxis, :])**2))
+        else:  # Gauss
+            Z = (1 / (2 * np.pi)**0.5 / sigma[np.newaxis, :]
+                 * np.exp(-t_diff**2 / 2 / sigma[np.newaxis, :]**2))
 
-    # --- vectorized balloon estimator ---
-    G = (1 / (2 * np.pi)**0.5 / optwp[:, np.newaxis]
-         * np.exp(-t_diff_nz**2 / 2 / optwp[:, np.newaxis]**2))
-    yv = np.sum(y_hist_nz[np.newaxis, :] * dt * G, axis=1)
-    yv = yv * N / np.sum(yv * dt)
+        optwp = np.sum(optwv[np.newaxis, :] * Z, axis=1) / np.sum(Z, axis=1)
+
+        # --- vectorized balloon estimator ---
+        G = (1 / (2 * np.pi)**0.5 / optwp[:, np.newaxis]
+             * np.exp(-t_diff_nz**2 / 2 / optwp[:, np.newaxis]**2))
+        yv = np.sum(y_hist_nz[np.newaxis, :] * dt * G, axis=1)
+        yv = yv * N / np.sum(yv * dt)
 
     # cost function of estimated kernel
     cg = yv**2 - 2 * yv * y_hist + 2 / (2 * np.pi)**0.5 / optwp * y_hist
