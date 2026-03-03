@@ -98,10 +98,36 @@ Reproduce: `python benchmarks/performance_comparison/run_mise_comparison.py`
   a time histogram," *Neural Computation* 19(6): 1503-1527, 2007.
   [doi:10.1162/neco.2007.19.6.1503](https://doi.org/10.1162/neco.2007.19.6.1503)
 
+  ```bibtex
+  @article{shimazaki2007histogram,
+    author  = {Shimazaki, Hideaki and Shinomoto, Shigeru},
+    title   = {A Method for Selecting the Bin Size of a Time Histogram},
+    journal = {Neural Computation},
+    volume  = {19},
+    number  = {6},
+    pages   = {1503--1527},
+    year    = {2007},
+    doi     = {10.1162/neco.2007.19.6.1503}
+  }
+  ```
+
 - H. Shimazaki and S. Shinomoto, "Kernel bandwidth optimization in spike
   rate estimation," *Journal of Computational Neuroscience* 29(1-2):
   171-182, 2010.
   [doi:10.1007/s10827-009-0180-4](https://doi.org/10.1007/s10827-009-0180-4)
+
+  ```bibtex
+  @article{shimazaki2010kernel,
+    author  = {Shimazaki, Hideaki and Shinomoto, Shigeru},
+    title   = {Kernel Bandwidth Optimization in Spike Rate Estimation},
+    journal = {Journal of Computational Neuroscience},
+    volume  = {29},
+    number  = {1--2},
+    pages   = {171--182},
+    year    = {2010},
+    doi     = {10.1007/s10827-009-0180-4}
+  }
+  ```
 
 ## Authors
 
