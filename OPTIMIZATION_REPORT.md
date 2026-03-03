@@ -55,7 +55,7 @@ Falls back to pure NumPy when not installed (12.4x speedup without them).
   mixture (n=1000)
 - **Verification**: `python tests/run_tests.py` — 18 golden checks at
   `rtol=1e-10` must all pass after every change
-- **Harness**: `tests/run_opt_experiments.py` records results to JSON;
+- **Harness**: `benchmarks/run_opt_experiments.py` records results to JSON;
   `--report` prints comparison table
 
 ## 3. Optimization Details

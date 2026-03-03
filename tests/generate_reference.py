@@ -26,7 +26,7 @@ OLD_FAITHFUL = np.array([
     2.72, 4.58, 1.90, 4.50, 1.95, 4.83, 4.12,
 ])
 
-OUT_DIR = os.path.join(os.path.dirname(__file__), "unit", "reference_data")
+OUT_DIR = os.path.join(os.path.dirname(__file__), "reference_data")
 os.makedirs(OUT_DIR, exist_ok=True)
 
 x = OLD_FAITHFUL.copy()

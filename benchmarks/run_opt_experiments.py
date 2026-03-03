@@ -2,9 +2,9 @@
 """Optimization experiment benchmark harness for ssdensity.
 
 Usage:
-    python tests/run_opt_experiments.py --experiment baseline
-    python tests/run_opt_experiments.py --experiment A1-searchsorted
-    python tests/run_opt_experiments.py --report
+    python benchmarks/run_opt_experiments.py --experiment baseline
+    python benchmarks/run_opt_experiments.py --experiment A1-searchsorted
+    python benchmarks/run_opt_experiments.py --report
 """
 import argparse
 import json

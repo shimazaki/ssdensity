@@ -2,10 +2,10 @@
 """Benchmark runner for ssdensity functions.
 
 Runs each function N times, records wall/CPU mean+std, and appends results
-to tests/benchmarks.json.
+to benchmarks/benchmarks.json.
 
 Usage:
-    python tests/run_benchmarks.py [--n-runs 10]
+    python benchmarks/run_benchmarks.py [--n-runs 10]
 """
 import argparse
 import json
