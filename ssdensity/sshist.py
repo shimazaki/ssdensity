@@ -1,7 +1,7 @@
 import numpy as np
 
 try:
-    from numba import njit
+    from numba import njit, prange
     _HAS_NUMBA = True
 except ImportError:
     _HAS_NUMBA = False
@@ -106,12 +106,12 @@ def _sshist_cost_numpy(x_sorted, x_min, x_max, N, D, SN):
 
 def _make_numba_kernel():
     """Create numba-JIT compiled cost function (called once at import)."""
-    @njit(cache=True)
+    @njit(parallel=True)
     def _cost(x_sorted, x_min, x_max, N_MIN, N_MAX, SN):
         T = x_max - x_min
         n_range = N_MAX - N_MIN + 1
         C = np.zeros(n_range)
-        for i in range(n_range):
+        for i in prange(n_range):
             n = N_MIN + i
             D = T / n
             cost_sum = 0.0
