@@ -81,6 +81,16 @@ from ssdensity import sshist_classic, sskernel_classic, ssvkernel_classic
 The improved versions are the default and recommended for normal use.
 The `_classic` variants are provided for reference and reproducibility.
 
+## Marron-Wand benchmark densities
+
+![Marron-Wand densities](benchmarks/marron_wand/compare_methods_optimized.png)
+
+The 15 Marron-Wand (1992) benchmark densities (gray fill = true density) with
+`sshist` (purple), `sskernel` (blue), and `ssvkernel` (orange) overlaid
+(*n* = 1000). Each subplot shows ISE and computation time. The locally adaptive
+`ssvkernel` tracks fine structure (e.g., #10 Claw, #15 Discrete comb) that the
+fixed-bandwidth `sskernel` smooths over.
+
 ## Comparison of methods
 
 Ten density estimation methods are evaluated on the 15 Marron-Wand (1992)
