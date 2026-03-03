@@ -913,7 +913,7 @@ def _method_marker(name):
 
 
 def _scatter_speed_on_ax(ax, agg, densities, methods, n_samples, time_key,
-                         xlabel):
+                         xlabel, title=None):
     """Draw accuracy-vs-speed scatter on a single axes.
 
     Parameters
@@ -922,6 +922,8 @@ def _scatter_speed_on_ax(ax, agg, densities, methods, n_samples, time_key,
         'median_wall_time' or 'median_cpu_time'
     xlabel : str
         Label for the x-axis.
+    title : str, optional
+        Panel title.  Defaults to 'n = {n_samples}'.
     """
     active = [name for name, _, avail in methods if avail]
     dnames = [d['name'] for d in densities]
@@ -949,7 +951,7 @@ def _scatter_speed_on_ax(ax, agg, densities, methods, n_samples, time_key,
         ax.set_xlim(min(xs) / pad, max(xs) * pad)
     ax.set_xlabel(xlabel, fontsize=10)
     ax.set_ylabel('Median ISE', fontsize=10)
-    ax.set_title(f'n = {n_samples}', fontsize=11, fontweight='bold')
+    ax.set_title(title or f'n = {n_samples}', fontsize=11, fontweight='bold')
     ax.grid(True, alpha=0.3, which='both')
 
     # Lower-left "better" annotation
@@ -970,18 +972,12 @@ def fig_accuracy_vs_speed(agg, densities, methods, out_dir, n_samples):
 
     _scatter_speed_on_ax(axes[0], agg, densities, methods, n_samples,
                          'median_cpu_time',
-                         'Median CPU time per fit+evaluate (ms)')
+                         'Median CPU time per fit+evaluate (ms)',
+                         title='CPU time')
     _scatter_speed_on_ax(axes[1], agg, densities, methods, n_samples,
                          'median_wall_time',
-                         'Median wall time per fit+evaluate (ms)')
-
-    # Panel labels
-    axes[0].text(0.02, 0.98, 'CPU time', transform=axes[0].transAxes,
-                 fontsize=11, fontweight='bold', va='top', ha='left',
-                 color='#444444')
-    axes[1].text(0.02, 0.98, 'Wall time', transform=axes[1].transAxes,
-                 fontsize=11, fontweight='bold', va='top', ha='left',
-                 color='#444444')
+                         'Median wall time per fit+evaluate (ms)',
+                         title='Wall time')
 
     fig.suptitle(f'Accuracy vs Speed  (n={n_samples})', fontsize=13,
                  fontweight='bold', y=1.02)
@@ -1123,16 +1119,12 @@ def fig_accuracy_vs_speed_multi(all_agg, densities, methods, out_dir,
     for row, ns in enumerate(sample_sizes):
         _scatter_speed_on_ax(axes[row, 0], all_agg[ns], densities, methods, ns,
                              'median_cpu_time',
-                             'Median CPU time per fit+evaluate (ms)')
+                             'Median CPU time per fit+evaluate (ms)',
+                             title=f'CPU time (n={ns})')
         _scatter_speed_on_ax(axes[row, 1], all_agg[ns], densities, methods, ns,
                              'median_wall_time',
-                             'Median wall time per fit+evaluate (ms)')
-        axes[row, 0].text(0.02, 0.98, 'CPU time', transform=axes[row, 0].transAxes,
-                          fontsize=11, fontweight='bold', va='top', ha='left',
-                          color='#444444')
-        axes[row, 1].text(0.02, 0.98, 'Wall time', transform=axes[row, 1].transAxes,
-                          fontsize=11, fontweight='bold', va='top', ha='left',
-                          color='#444444')
+                             'Median wall time per fit+evaluate (ms)',
+                             title=f'Wall time (n={ns})')
 
     fig.suptitle('Accuracy vs Speed', fontsize=14, fontweight='bold', y=1.02)
     fig.tight_layout()
