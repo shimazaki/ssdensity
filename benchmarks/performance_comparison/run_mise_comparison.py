@@ -542,7 +542,7 @@ def run_mc(mc_runs, n_samples, methods, densities, verbose=True):
     for name, _, _ in methods:
         results[name] = {}
         for d in densities:
-            results[name][d['name']] = {'ise': [], 'time': []}
+            results[name][d['name']] = {'ise': [], 'wall_time': [], 'cpu_time': []}
 
     # Master seed sequence for reproducibility
     ss = np.random.SeedSequence(42)
@@ -570,17 +570,19 @@ def run_mc(mc_runs, n_samples, methods, densities, verbose=True):
                 try:
                     with warnings.catch_warnings():
                         warnings.simplefilter('ignore')
-                        # Use wall time (perf_counter) uniformly — process_time
-                        # misses GPU kernels and inflates multi-threaded methods.
-                        t0 = time.perf_counter()
+                        t0_wall = time.perf_counter()
+                        t0_cpu = time.process_time()
                         y_est = func(x_sorted, t_grid)
-                        elapsed = time.perf_counter() - t0
+                        elapsed_cpu = time.process_time() - t0_cpu
+                        elapsed_wall = time.perf_counter() - t0_wall
                     ise = compute_ise(y_est, t_grid, f_true)
                     results[name][density['name']]['ise'].append(ise)
-                    results[name][density['name']]['time'].append(elapsed)
+                    results[name][density['name']]['wall_time'].append(elapsed_wall)
+                    results[name][density['name']]['cpu_time'].append(elapsed_cpu)
                 except Exception:
                     results[name][density['name']]['ise'].append(np.nan)
-                    results[name][density['name']]['time'].append(np.nan)
+                    results[name][density['name']]['wall_time'].append(np.nan)
+                    results[name][density['name']]['cpu_time'].append(np.nan)
 
             done += 1
             if verbose:
@@ -600,11 +602,12 @@ def run_mc(mc_runs, n_samples, methods, densities, verbose=True):
 # ── H. Aggregation and output ────────────────────────────────────────
 
 def aggregate(results, densities, methods):
-    """Compute median ISE, std(ISE), median_time per method per density.
+    """Compute median ISE, std(ISE), median times per method per density.
 
     Returns:
         agg: {method: {density: {'median_ise': float, 'std_ise': float,
-                                  'median_time': float, 'n_ok': int},
+                                  'median_wall_time': float,
+                                  'median_cpu_time': float, 'n_ok': int},
                         '_pooled_median_ise': float}}
     """
     agg = {}
@@ -616,21 +619,24 @@ def aggregate(results, densities, methods):
         for d in densities:
             dname = d['name']
             ise_arr = np.array(results[name][dname]['ise'])
-            time_arr = np.array(results[name][dname]['time'])
+            wall_arr = np.array(results[name][dname]['wall_time'])
+            cpu_arr = np.array(results[name][dname]['cpu_time'])
             ok = ~np.isnan(ise_arr)
             all_ise.extend(ise_arr[ok].tolist())
             if ok.sum() > 0:
                 agg[name][dname] = {
                     'median_ise': float(np.median(ise_arr[ok])),
                     'std_ise': float(np.std(ise_arr[ok])),
-                    'median_time': float(np.median(time_arr[ok])),
+                    'median_wall_time': float(np.median(wall_arr[ok])),
+                    'median_cpu_time': float(np.median(cpu_arr[ok])),
                     'n_ok': int(ok.sum()),
                 }
             else:
                 agg[name][dname] = {
                     'median_ise': float('nan'),
                     'std_ise': float('nan'),
-                    'median_time': float('nan'),
+                    'median_wall_time': float('nan'),
+                    'median_cpu_time': float('nan'),
                     'n_ok': 0,
                 }
         agg[name]['_pooled_median_ise'] = (
@@ -743,33 +749,35 @@ def print_tables(agg, ranks, densities, methods, mc_runs, n_samples):
         print(f'  {med_v*1000:{col_w}.2f}', end='')
     print()
 
-    # ── Time table ──
-    print()
-    print('Median CPU time (ms)')
-    print(f'  {"Density":<{name_w}}', end='')
-    for m in active:
-        print(f'  {m:>{col_w}}', end='')
-    print()
-    print('  ' + '-' * (name_w + len(active) * (col_w + 2)))
-
-    for dname in dnames:
-        print(f'  {dname:<{name_w}}', end='')
-        for m in active:
-            v = agg[m][dname]['median_time']
-            if np.isnan(v):
-                print(f'  {"FAIL":>{col_w}}', end='')
-            else:
-                print(f'  {v*1000:{col_w}.1f}', end='')
+    # ── Time tables ──
+    for time_key, time_label in [('median_wall_time', 'Median wall time (ms)'),
+                                  ('median_cpu_time', 'Median CPU time (ms)')]:
         print()
+        print(time_label)
+        print(f'  {"Density":<{name_w}}', end='')
+        for m in active:
+            print(f'  {m:>{col_w}}', end='')
+        print()
+        print('  ' + '-' * (name_w + len(active) * (col_w + 2)))
 
-    # Mean time row
-    print('  ' + '-' * (name_w + len(active) * (col_w + 2)))
-    print(f'  {"Mean":<{name_w}}', end='')
-    for m in active:
-        vals = [agg[m][dn]['median_time'] for dn in dnames]
-        mean_v = np.nanmean(vals)
-        print(f'  {mean_v*1000:{col_w}.1f}', end='')
-    print()
+        for dname in dnames:
+            print(f'  {dname:<{name_w}}', end='')
+            for m in active:
+                v = agg[m][dname][time_key]
+                if np.isnan(v):
+                    print(f'  {"FAIL":>{col_w}}', end='')
+                else:
+                    print(f'  {v*1000:{col_w}.1f}', end='')
+            print()
+
+        # Mean time row
+        print('  ' + '-' * (name_w + len(active) * (col_w + 2)))
+        print(f'  {"Mean":<{name_w}}', end='')
+        for m in active:
+            vals = [agg[m][dn][time_key] for dn in dnames]
+            mean_v = np.nanmean(vals)
+            print(f'  {mean_v*1000:{col_w}.1f}', end='')
+        print()
 
     # ── Rank summary ──
     print()
@@ -820,7 +828,8 @@ def save_json(agg, ranks, results, densities, methods, mc_runs, n_samples,
         ],
         'median_ise': {},
         'std_ise': {},
-        'median_time': {},
+        'median_wall_time': {},
+        'median_cpu_time': {},
         'overall_median_ise': {},
         'mean_rank': {},
         'ranks': {},
@@ -830,7 +839,10 @@ def save_json(agg, ranks, results, densities, methods, mc_runs, n_samples,
     for m in active:
         data['median_ise'][m] = {dn: agg[m][dn]['median_ise'] for dn in dnames}
         data['std_ise'][m] = {dn: agg[m][dn]['std_ise'] for dn in dnames}
-        data['median_time'][m] = {dn: agg[m][dn]['median_time'] for dn in dnames}
+        data['median_wall_time'][m] = {
+            dn: agg[m][dn]['median_wall_time'] for dn in dnames}
+        data['median_cpu_time'][m] = {
+            dn: agg[m][dn]['median_cpu_time'] for dn in dnames}
         data['overall_median_ise'][m] = agg[m]['_pooled_median_ise']
         data['mean_rank'][m] = float(np.mean(ranks[m]))
         data['ranks'][m] = [float(r) for r in ranks[m]]
@@ -900,17 +912,24 @@ def _method_marker(name):
     return METHOD_MARKERS.get(base, 'o')
 
 
-def fig_accuracy_vs_speed(agg, densities, methods, out_dir, n_samples):
-    """Scatter: x=median CPU time (log), y=pooled median ISE (log)."""
+def _scatter_speed_on_ax(ax, agg, densities, methods, n_samples, time_key,
+                         xlabel):
+    """Draw accuracy-vs-speed scatter on a single axes.
+
+    Parameters
+    ----------
+    time_key : str
+        'median_wall_time' or 'median_cpu_time'
+    xlabel : str
+        Label for the x-axis.
+    """
     active = [name for name, _, avail in methods if avail]
     dnames = [d['name'] for d in densities]
-
-    fig, ax = plt.subplots(figsize=(7, 7))
 
     xs, ys = [], []
     for m in active:
         pooled_ise = agg[m]['_pooled_median_ise']
-        mean_time = np.nanmean([agg[m][dn]['median_time'] for dn in dnames])
+        mean_time = np.nanmean([agg[m][dn][time_key] for dn in dnames])
         if np.isnan(pooled_ise) or np.isnan(mean_time):
             continue
         xs.append(mean_time * 1000)
@@ -919,7 +938,6 @@ def fig_accuracy_vs_speed(agg, densities, methods, out_dir, n_samples):
                    c=_method_color(m),
                    marker=_method_marker(m),
                    s=120, zorder=5, edgecolors='white', linewidths=0.5)
-        # Label offset to avoid overlap
         ax.annotate(m, (mean_time * 1000, pooled_ise),
                     textcoords='offset points', xytext=(8, 4),
                     fontsize=8, color=_method_color(m))
@@ -929,12 +947,12 @@ def fig_accuracy_vs_speed(agg, densities, methods, out_dir, n_samples):
     if xs:
         pad = 2.0
         ax.set_xlim(min(xs) / pad, max(xs) * pad)
-    ax.set_xlabel('Median CPU time per fit+evaluate (ms)', fontsize=11)
-    ax.set_ylabel('Median ISE', fontsize=11)
-    ax.set_title(f'Accuracy vs Speed  (n={n_samples})', fontsize=13)
+    ax.set_xlabel(xlabel, fontsize=10)
+    ax.set_ylabel('Median ISE', fontsize=10)
+    ax.set_title(f'n = {n_samples}', fontsize=11, fontweight='bold')
     ax.grid(True, alpha=0.3, which='both')
 
-    # Lower-left annotation
+    # Lower-left "better" annotation
     ax.annotate('better', xy=(0.02, 0.02), xycoords='axes fraction',
                 fontsize=9, color='gray', fontstyle='italic',
                 ha='left', va='bottom')
@@ -945,6 +963,28 @@ def fig_accuracy_vs_speed(agg, densities, methods, out_dir, n_samples):
                 xytext=(0.02, 0.20),
                 arrowprops=dict(arrowstyle='->', color='gray', lw=1.2))
 
+
+def fig_accuracy_vs_speed(agg, densities, methods, out_dir, n_samples):
+    """Two-panel scatter: CPU time (left) and wall time (right) vs ISE."""
+    fig, axes = plt.subplots(1, 2, figsize=(14, 7))
+
+    _scatter_speed_on_ax(axes[0], agg, densities, methods, n_samples,
+                         'median_cpu_time',
+                         'Median CPU time per fit+evaluate (ms)')
+    _scatter_speed_on_ax(axes[1], agg, densities, methods, n_samples,
+                         'median_wall_time',
+                         'Median wall time per fit+evaluate (ms)')
+
+    # Panel labels
+    axes[0].text(0.02, 0.98, 'CPU time', transform=axes[0].transAxes,
+                 fontsize=11, fontweight='bold', va='top', ha='left',
+                 color='#444444')
+    axes[1].text(0.02, 0.98, 'Wall time', transform=axes[1].transAxes,
+                 fontsize=11, fontweight='bold', va='top', ha='left',
+                 color='#444444')
+
+    fig.suptitle(f'Accuracy vs Speed  (n={n_samples})', fontsize=13,
+                 fontweight='bold', y=1.02)
     fig.tight_layout()
     path = os.path.join(out_dir, 'accuracy_vs_speed.png')
     fig.savefig(path, dpi=150, bbox_inches='tight')
@@ -1070,48 +1110,27 @@ def fig_ise_violin(ise_vals, methods, out_dir, n_samples):
 
 # ── J2. Multi-panel figures ──────────────────────────────────────────
 
-def _scatter_on_ax(ax, agg, densities, methods, n_samples):
-    """Draw accuracy-vs-speed scatter on a single axes."""
-    active = [name for name, _, avail in methods if avail]
-    dnames = [d['name'] for d in densities]
-
-    xs, ys = [], []
-    for m in active:
-        pooled_ise = agg[m]['_pooled_median_ise']
-        mean_time = np.nanmean([agg[m][dn]['median_time'] for dn in dnames])
-        if np.isnan(pooled_ise) or np.isnan(mean_time):
-            continue
-        xs.append(mean_time * 1000)
-        ys.append(pooled_ise)
-        ax.scatter(mean_time * 1000, pooled_ise,
-                   c=_method_color(m),
-                   marker=_method_marker(m),
-                   s=100, zorder=5, edgecolors='white', linewidths=0.5)
-        ax.annotate(m, (mean_time * 1000, pooled_ise),
-                    textcoords='offset points', xytext=(8, 4),
-                    fontsize=7, color=_method_color(m))
-
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    if xs:
-        pad = 2.0
-        ax.set_xlim(min(xs) / pad, max(xs) * pad)
-    ax.set_xlabel('Median time per fit+evaluate (ms)', fontsize=10)
-    ax.set_ylabel('Median ISE', fontsize=10)
-    ax.set_title(f'n = {n_samples}', fontsize=11, fontweight='bold')
-    ax.grid(True, alpha=0.3, which='both')
-
-
 def fig_accuracy_vs_speed_multi(all_agg, densities, methods, out_dir,
                                 sample_sizes):
-    """Two-column scatter: accuracy vs speed for each sample size."""
-    ncols = len(sample_sizes)
-    fig, axes = plt.subplots(1, ncols, figsize=(7 * ncols, 7))
-    if ncols == 1:
-        axes = [axes]
+    """Grid of scatter panels: rows = sample sizes, columns = CPU / wall time."""
+    nrows = len(sample_sizes)
+    fig, axes = plt.subplots(nrows, 2, figsize=(14, 7 * nrows))
+    if nrows == 1:
+        axes = axes[np.newaxis, :]
 
-    for ax, ns in zip(axes, sample_sizes):
-        _scatter_on_ax(ax, all_agg[ns], densities, methods, ns)
+    for row, ns in enumerate(sample_sizes):
+        _scatter_speed_on_ax(axes[row, 0], all_agg[ns], densities, methods, ns,
+                             'median_cpu_time',
+                             'Median CPU time per fit+evaluate (ms)')
+        _scatter_speed_on_ax(axes[row, 1], all_agg[ns], densities, methods, ns,
+                             'median_wall_time',
+                             'Median wall time per fit+evaluate (ms)')
+        axes[row, 0].text(0.02, 0.98, 'CPU time', transform=axes[row, 0].transAxes,
+                          fontsize=11, fontweight='bold', va='top', ha='left',
+                          color='#444444')
+        axes[row, 1].text(0.02, 0.98, 'Wall time', transform=axes[row, 1].transAxes,
+                          fontsize=11, fontweight='bold', va='top', ha='left',
+                          color='#444444')
 
     fig.suptitle('Accuracy vs Speed', fontsize=14, fontweight='bold', y=1.02)
     fig.tight_layout()
