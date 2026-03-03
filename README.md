@@ -81,44 +81,15 @@ from ssdensity import sshist_classic, sskernel_classic, ssvkernel_classic
 The improved versions are the default and recommended for normal use.
 The `_classic` variants are provided for reference and reproducibility.
 
-## Benchmark
-
-![Marron-Wand benchmark](benchmarks/marron_wand/compare_methods_optimized.png)
-
-Comparison of all three methods on the 15 Marron-Wand densities (1000 samples
-each). See `benchmarks/` for the benchmark notebook.
-
-### MISE comparison
-
-![Accuracy vs Speed](benchmarks/performance_comparison/fig/accuracy_vs_speed.png)
+## Comparison of methods
 
 ![ISE violin](benchmarks/performance_comparison/fig/ise_violin.png)
+
+![Accuracy vs Speed](benchmarks/performance_comparison/fig/accuracy_vs_speed.png)
 
 Median Integrated Squared Error on 15 Marron-Wand densities (n=500, 50 MC runs).
 `sskernel`, `ssvkernel`, and KDE diffusion consistently rank in the top 3.
 Reproduce: `python benchmarks/performance_comparison/run_mise_comparison.py`
-
-### Speed comparison
-
-Median CPU time on bimodal synthetic data (0.5 N(-1,1) + 0.5 N(1,1)),
-Python 3.11, NumPy 2.4, 256-point evaluation grid:
-
-| Method | n=1,000 | n=10,000 | n=100,000 |
-|---|---:|---:|---:|
-| **sskernel** | 1.5 ms | 1.6 ms | 4.2 ms |
-| **ssvkernel** | 46.4 ms | 48.1 ms | 52.1 ms |
-| **sshist** | 123.3 ms | 231.2 ms | 298.4 ms |
-| np.histogram (Scott) | 0.1 ms | 0.2 ms | 1.7 ms |
-| KDEpy FFTKDE (Silverman) | 0.9 ms | 0.9 ms | 2.5 ms |
-| statsmodels KDE (normal ref) | 2.9 ms | 26.5 ms | 508.8 ms |
-| sklearn KernelDensity (Scott) | 8.0 ms | 62.3 ms | 546.1 ms |
-| scipy.gaussian_kde (Scott) | 257.0 ms | 3.07 s | 12.52 s |
-
-`sskernel` uses data-driven MISE optimization yet runs competitively with
-rule-of-thumb methods. `scipy.gaussian_kde` is notably slow because it
-evaluates the full kernel sum without FFT acceleration.
-sskernel/ssvkernel run with `bootstrap=0` (default, no bootstrap).
-Reproduce: `python benchmarks/speed_comparison/run_speed_comparison.py`
 
 
 ## References
