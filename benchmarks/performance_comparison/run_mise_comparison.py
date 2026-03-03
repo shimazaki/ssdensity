@@ -995,6 +995,8 @@ def fig_accuracy_vs_speed(agg, densities, methods, out_dir, n_samples):
 def _heatmap_on_ax(ax, agg, densities, methods, n_samples):
     """Draw MISE heatmap on a single axes using seaborn."""
     active = [name for name, _, avail in methods if avail]
+    # Sort methods by pooled median ISE (best first)
+    active.sort(key=lambda m: agg[m]['_pooled_median_ise'])
     dnames = [d['name'] for d in densities]
     short_names = [dn.replace('#', '') for dn in dnames]
 
