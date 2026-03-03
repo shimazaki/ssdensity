@@ -3,5 +3,4 @@ __pycache__/
 ssdensity.egg-info/
 dist/
 tmp/
-tests/performance_comparison/data/
-tests/performance_comparison/fig/
+benchmarks/performance_comparison/data/

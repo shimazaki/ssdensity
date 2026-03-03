@@ -83,10 +83,20 @@ The `_classic` variants are provided for reference and reproducibility.
 
 ## Benchmark
 
-![Marron-Wand benchmark](tests/marron_wand/compare_methods_optimized.png)
+![Marron-Wand benchmark](benchmarks/marron_wand/compare_methods_optimized.png)
 
 Comparison of all three methods on the 15 Marron-Wand densities (1000 samples
-each). See `tests/` for the benchmark notebook.
+each). See `benchmarks/` for the benchmark notebook.
+
+### MISE comparison
+
+![Accuracy vs Speed](benchmarks/performance_comparison/fig/accuracy_vs_speed.png)
+
+![ISE violin](benchmarks/performance_comparison/fig/ise_violin.png)
+
+Median Integrated Squared Error on 15 Marron-Wand densities (n=500, 50 MC runs).
+`sskernel`, `ssvkernel`, and KDE diffusion consistently rank in the top 3.
+Reproduce: `python benchmarks/performance_comparison/run_mise_comparison.py`
 
 ### Speed comparison
 
@@ -108,7 +118,7 @@ Python 3.11, NumPy 2.4, 256-point evaluation grid:
 rule-of-thumb methods. `scipy.gaussian_kde` is notably slow because it
 evaluates the full kernel sum without FFT acceleration.
 sskernel/ssvkernel run with `bootstrap=0` (default, no bootstrap).
-Reproduce: `python tests/speed_comparison/run_speed_comparison.py`
+Reproduce: `python benchmarks/speed_comparison/run_speed_comparison.py`
 
 
 ## References
