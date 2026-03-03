@@ -96,6 +96,16 @@ by median ISE (white line); lower is better.
 `ssvkernel`, KDE diffusion (Botev et al. 2010), and `sskernel` form the top
 tier with the lowest medians and tightest distributions.
 
+### MISE heatmap
+
+![MISE heatmap](benchmarks/performance_comparison/fig/mise_heatmap.png)
+
+Median ISE (x10^-3) for each method-density pair, sorted by pooled median ISE
+(best at top). Darker cells indicate lower (better) error. The hardest
+densities -- #3 Strongly skewed, #5 Outlier, #14 Smooth comb, #15 Discrete
+comb -- separate methods most clearly. `sskernel`, `ssvkernel`, and KDE
+diffusion maintain consistently low error across all 15 densities.
+
 ### Accuracy vs speed
 
 ![Accuracy vs Speed](benchmarks/performance_comparison/fig/accuracy_vs_speed.png)
@@ -108,16 +118,6 @@ more accurate and faster. The gap between CPU and wall time reveals implicit
 multi-threading: `sskernel` and `ssvkernel` use ~100x more CPU cycles than wall
 time on a multi-core machine, because NumPy's FFT (pocketfft) and BLAS
 (OpenBLAS) parallelize automatically.
-
-### MISE heatmap
-
-![MISE heatmap](benchmarks/performance_comparison/fig/mise_heatmap.png)
-
-Median ISE (x10^-3) for each method-density pair. Darker cells indicate lower
-(better) error. The hardest densities -- #3 Strongly skewed, #5 Outlier,
-#14 Smooth comb, #15 Discrete comb -- separate methods most clearly.
-`sskernel`, `ssvkernel`, and KDE diffusion maintain consistently low error
-across all 15 densities.
 
 Reproduce: `python benchmarks/performance_comparison/run_mise_comparison.py`
 
