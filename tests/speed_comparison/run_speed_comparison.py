@@ -5,7 +5,7 @@ Benchmarks execution time (CPU) of ssdensity methods against numpy, scipy,
 KDEpy, statsmodels, and scikit-learn on bimodal synthetic data.
 
 Usage:
-    python tests/run_speed_comparison.py [--n-runs 5] [--skip-large]
+    python tests/speed_comparison/run_speed_comparison.py [--n-runs 5] [--skip-large]
 """
 import argparse
 import platform
