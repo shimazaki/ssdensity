@@ -83,12 +83,42 @@ The `_classic` variants are provided for reference and reproducibility.
 
 ## Comparison of methods
 
+Ten density estimation methods are evaluated on the 15 Marron-Wand (1992)
+benchmark densities (*n* = 500, 50 Monte Carlo runs per density).
+
+### ISE distribution
+
 ![ISE violin](benchmarks/performance_comparison/fig/ise_violin.png)
+
+Each violin shows the distribution of Integrated Squared Error (ISE) across
+all 750 (density, run) pairs on a log10 scale. Methods are sorted left to right
+by median ISE (white line); lower is better.
+`ssvkernel`, KDE diffusion (Botev et al. 2010), and `sskernel` form the top
+tier with the lowest medians and tightest distributions.
+
+### Accuracy vs speed
 
 ![Accuracy vs Speed](benchmarks/performance_comparison/fig/accuracy_vs_speed.png)
 
-Median Integrated Squared Error on 15 Marron-Wand densities (n=500, 50 MC runs).
-`sskernel`, `ssvkernel`, and KDE diffusion consistently rank in the top 3.
+Pooled median ISE (y-axis, log scale) versus mean computation time per
+fit-and-evaluate call (x-axis, log scale). The left panel shows CPU time
+(`time.process_time`, summed across all threads); the right panel shows wall
+time (`time.perf_counter`). Points closer to the lower-left corner are both
+more accurate and faster. The gap between CPU and wall time reveals implicit
+multi-threading: `sskernel` and `ssvkernel` use ~100x more CPU cycles than wall
+time on a multi-core machine, because NumPy's FFT (pocketfft) and BLAS
+(OpenBLAS) parallelize automatically.
+
+### MISE heatmap
+
+![MISE heatmap](benchmarks/performance_comparison/fig/mise_heatmap.png)
+
+Median ISE (x10^-3) for each method-density pair. Darker cells indicate lower
+(better) error. The hardest densities -- #3 Strongly skewed, #5 Outlier,
+#14 Smooth comb, #15 Discrete comb -- separate methods most clearly.
+`sskernel`, `ssvkernel`, and KDE diffusion maintain consistently low error
+across all 15 densities.
+
 Reproduce: `python benchmarks/performance_comparison/run_mise_comparison.py`
 
 
