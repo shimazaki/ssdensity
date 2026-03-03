@@ -131,6 +131,27 @@ diffusion maintain consistently low error across all 15 densities.
 
 Reproduce: `python benchmarks/performance_comparison/run_mise_comparison.py`
 
+### Computation speed
+
+Median wall time on Marron-Wand #1 Gaussian (*n* = 1000, 20 runs,
+2x Xeon 6258R / 112 threads):
+
+| Function | Classic (ms) | Optimized (ms) | Speedup |
+|----------|-------------|----------------|---------|
+| `sshist` | 1779 | 5.3 | 334x |
+| `sskernel` | 67 | 37 | 2x |
+| `ssvkernel` | 3443 | 505 | 7x |
+
+- **sshist**: Numba JIT with parallel outer loop (`prange`) over candidate
+  bin counts; replaces per-shift `np.histogram` with `searchsorted`
+- **sskernel**: Real FFT (`rfft`/`irfft`) halves transform size vs complex
+  FFT; batched bootstrap FFTs in a single array call
+- **ssvkernel**: Batched FFTs grouped by padded length (~6400 individual
+  FFTs → ~3 forward + ~80 inverse); vectorized Nadaraya-Watson kernel
+  regression via broadcasting; vectorized bootstrap loop
+
+Reproduce: `python benchmarks/classic_vs_optimized.py`
+
 
 ## References
 
