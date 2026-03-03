@@ -94,7 +94,7 @@ fixed-bandwidth `sskernel` smooths over.
 ## Comparison of methods
 
 Ten density estimation methods are evaluated on the 15 Marron-Wand (1992)
-benchmark densities (*n* = 500, 50 Monte Carlo runs per density).
+benchmark densities (*n* = 1000, 50 Monte Carlo runs per density).
 
 ### ISE distribution
 
