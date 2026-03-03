@@ -5,7 +5,7 @@ Benchmarks execution time (CPU) of ssdensity methods against numpy, scipy,
 KDEpy, statsmodels, and scikit-learn on bimodal synthetic data.
 
 Usage:
-    python tests/speed_comparison/run_speed_comparison.py [--n-runs 5] [--skip-large]
+    python benchmarks/speed_comparison/run_speed_comparison.py [--n-runs 5] [--skip-large]
 """
 import argparse
 import platform
@@ -43,6 +43,12 @@ try:
     HAS_SKLEARN = True
 except ImportError:
     HAS_SKLEARN = False
+
+try:
+    from awkde import GaussianKDE
+    HAS_AWKDE = True
+except ImportError:
+    HAS_AWKDE = False
 
 N_GRID = 256  # common evaluation grid size for KDE methods
 
@@ -114,6 +120,12 @@ def bench_sklearn(x, t_grid):
     kde.score_samples(t_grid[:, np.newaxis])
 
 
+def bench_awkde(x, t_grid):
+    kde = GaussianKDE(glob_bw='silverman', alpha=0.5, diag_cov=True)
+    kde.fit(x[:, np.newaxis])
+    kde.predict(t_grid[:, np.newaxis])
+
+
 # ---------------------------------------------------------------------------
 # Timing harness
 # ---------------------------------------------------------------------------
@@ -165,6 +177,7 @@ def main():
         ("KDEpy FFTKDE", bench_kdepy, HAS_KDEPY),
         ("statsmodels KDE", bench_statsmodels, HAS_STATSMODELS),
         ("sklearn KernelDensity", bench_sklearn, HAS_SKLEARN),
+        ("awkde (adaptive)", bench_awkde, HAS_AWKDE),
     ]
 
     # Report missing packages

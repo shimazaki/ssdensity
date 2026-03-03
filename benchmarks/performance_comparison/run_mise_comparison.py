@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """MISE performance comparison: ssdensity vs state-of-the-art density estimators.
 
-Evaluates 10 methods on the 15 Marron-Wand (1992) benchmark densities via
+Evaluates 14 methods on the 15 Marron-Wand (1992) benchmark densities via
 Monte Carlo estimation of Median Integrated Squared Error. All methods
 use default settings for a fair comparison.
 
@@ -15,9 +15,11 @@ Methods:
   7. statsmodels KDE — normal_reference (default)
   8. fastkde         — self-consistent bandwidth (Bernacchia & Pigolotti 2011)
   9. KDE diffusion   — Botev et al. 2010 (full diffusion estimator)
- 10. GMM BIC         — sklearn EM + BIC model selection
- 11. Bayesian GMM    — sklearn Variational DP
- 12. Neural Spline Flow — normflows, Adam optimizer
+ 10. awkde           — adaptive-width KDE (mennthor/awkde, alpha=0.5)
+ 11. GMM BIC         — sklearn EM + BIC model selection
+ 12. Bayesian GMM    — sklearn Variational DP
+ 13. Neural Spline Flow — normflows, Adam optimizer
+ 14. Zuko NSF        — zuko neural spline flow, Adam optimizer
 
 Fairness note:
   The Marron-Wand densities are all finite Gaussian mixtures. GMM-based methods
@@ -32,10 +34,10 @@ References:
   The Annals of Statistics, 20(2):712-736.
 
 Usage:
-  python tests/performance_comparison/run_mise_comparison.py [options]
-  python tests/performance_comparison/run_mise_comparison.py --quick
-  python tests/performance_comparison/run_mise_comparison.py --mc-runs 100 --n-samples 1000
-  python tests/performance_comparison/run_mise_comparison.py --no-flow --no-figures
+  python benchmarks/performance_comparison/run_mise_comparison.py [options]
+  python benchmarks/performance_comparison/run_mise_comparison.py --quick
+  python benchmarks/performance_comparison/run_mise_comparison.py --mc-runs 100 --n-samples 1000
+  python benchmarks/performance_comparison/run_mise_comparison.py --no-flow --no-figures
 """
 import argparse
 import json
@@ -97,11 +99,24 @@ except ImportError:
     HAS_SEABORN = False
 
 try:
+    from awkde import GaussianKDE
+    HAS_AWKDE = True
+except ImportError:
+    HAS_AWKDE = False
+
+try:
     import torch
     import normflows as nf
     HAS_NORMFLOWS = True
 except ImportError:
     HAS_NORMFLOWS = False
+
+try:
+    import torch
+    import zuko
+    HAS_ZUKO = True
+except ImportError:
+    HAS_ZUKO = False
 
 try:
     import matplotlib
@@ -124,6 +139,13 @@ NSF_BINS = 8        # rational-quadratic spline bins
 NSF_EPOCHS = 300    # training epochs
 NSF_LR = 5e-4       # learning rate
 NSF_BATCH = 256     # batch size
+
+ZUKO_TRANSFORMS = 8   # number of spline transforms
+ZUKO_HIDDEN = (64, 64) # hidden features per transform
+ZUKO_BINS = 8          # rational-quadratic spline bins
+ZUKO_EPOCHS = 300      # training epochs
+ZUKO_LR = 5e-4         # learning rate
+ZUKO_BATCH = 256       # batch size
 
 
 # ── C. Marron-Wand density definitions ───────────────────────────────
@@ -360,6 +382,13 @@ def _get_torch_device():
     return torch.device('cpu')
 
 
+def _torch_device_tag():
+    """Return '(gpu)' or '(cpu)' for labeling flow methods."""
+    if torch.cuda.is_available():
+        return '(gpu)'
+    return '(cpu)'
+
+
 def wrap_nsf(x, t_grid):
     """Neural Spline Flow (1D) with normflows.
 
@@ -405,9 +434,73 @@ def wrap_nsf(x, t_grid):
     return y
 
 
+def wrap_awkde(x, t_grid):
+    """Adaptive-width KDE (mennthor/awkde).
+
+    Uses Silverman global bandwidth with alpha=0.5 local adaptation.
+    """
+    kde = GaussianKDE(glob_bw='silverman', alpha=0.5, diag_cov=True)
+    kde.fit(x[:, np.newaxis])
+    y = kde.predict(t_grid[:, np.newaxis])
+    y = np.maximum(y, 0.0)
+    return y
+
+
+def wrap_zuko_nsf(x, t_grid):
+    """Neural Spline Flow (1D) with zuko.
+
+    Uses GPU if available; falls back to single-threaded CPU.
+    Data is standardized before training (spline transforms are defined
+    over a bounded interval).
+    """
+    device = _get_torch_device()
+    if device.type == 'cpu':
+        torch.set_num_threads(1)
+
+    # Standardize data (zuko spline transforms cover [-5, 5])
+    x_mean, x_std = float(np.mean(x)), float(np.std(x))
+    if x_std < 1e-12:
+        x_std = 1.0
+    x_normed = (x - x_mean) / x_std
+
+    flow = zuko.flows.NSF(
+        features=1, context=0,
+        transforms=ZUKO_TRANSFORMS,
+        hidden_features=ZUKO_HIDDEN,
+        bins=ZUKO_BINS,
+    ).to(device)
+
+    optimizer = torch.optim.Adam(flow.parameters(), lr=ZUKO_LR)
+    x_tensor = torch.tensor(
+        x_normed.reshape(-1, 1), dtype=torch.float32, device=device)
+    n = len(x)
+
+    flow.train()
+    for _ in range(ZUKO_EPOCHS):
+        idx = torch.randperm(n, device=device)[:ZUKO_BATCH]
+        loss = -flow().log_prob(x_tensor[idx]).mean()
+        if torch.isnan(loss) or torch.isinf(loss):
+            continue
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    flow.eval()
+    t_normed = (t_grid - x_mean) / x_std
+    t_tensor = torch.tensor(
+        t_normed.reshape(-1, 1), dtype=torch.float32, device=device)
+    with torch.no_grad():
+        log_prob = flow().log_prob(t_tensor)
+        # Density in standardized space; divide by x_std for original space
+        y = torch.exp(log_prob).cpu().numpy().flatten() / x_std
+    y = np.maximum(y, 0.0)
+    return y
+
+
 # ── F. Method registry ──────────────────────────────────────────────
 
-def build_method_list(include_flow=True, include_gmm=False):
+def build_method_list(include_normflows=True, include_zuko=True,
+                      include_gmm=False):
     """Build list of (name, wrapper, available) tuples."""
     methods = [
         ('sskernel',        wrap_sskernel,        True),
@@ -419,12 +512,16 @@ def build_method_list(include_flow=True, include_gmm=False):
         ('statsmodels KDE', wrap_statsmodels_kde, HAS_STATSMODELS),
         ('fastkde',         wrap_fastkde,         HAS_FASTKDE),
         ('KDE diffusion',   wrap_kde_diffusion,   HAS_KDEDIFFUSION),
+        ('awkde',            wrap_awkde,            HAS_AWKDE),
     ]
     if include_gmm:
         methods.append(('GMM BIC',         wrap_gmm_bic,         HAS_SKLEARN))
         methods.append(('Bayesian GMM',    wrap_bayesian_gmm,    HAS_SKLEARN))
-    if include_flow:
-        methods.append(('Neural Spline Flow', wrap_nsf, HAS_NORMFLOWS))
+    tag = _torch_device_tag() if (HAS_NORMFLOWS or HAS_ZUKO) else '(cpu)'
+    if include_normflows:
+        methods.append((f'Neural Spline Flow {tag}', wrap_nsf, HAS_NORMFLOWS))
+    if include_zuko:
+        methods.append((f'Zuko NSF {tag}',        wrap_zuko_nsf,        HAS_ZUKO))
     return methods
 
 
@@ -696,8 +793,9 @@ def print_tables(agg, ranks, densities, methods, mc_runs, n_samples):
         print()
 
 
-def save_json(agg, ranks, densities, methods, mc_runs, n_samples, out_dir):
-    """Save results to JSON."""
+def save_json(agg, ranks, results, densities, methods, mc_runs, n_samples,
+              out_dir):
+    """Save results to JSON, including raw ISE values and density definitions."""
     active = [name for name, _, avail in methods if avail]
     dnames = [d['name'] for d in densities]
 
@@ -713,12 +811,20 @@ def save_json(agg, ranks, densities, methods, mc_runs, n_samples, out_dir):
         },
         'methods': active,
         'densities': dnames,
+        'density_defs': [
+            {'name': d['name'],
+             'weights': d['weights'],
+             'means': d['means'],
+             'sigmas': d['sigmas']}
+            for d in densities
+        ],
         'median_ise': {},
         'std_ise': {},
         'median_time': {},
         'overall_median_ise': {},
         'mean_rank': {},
         'ranks': {},
+        'raw_ise': {},
     }
 
     for m in active:
@@ -728,6 +834,10 @@ def save_json(agg, ranks, densities, methods, mc_runs, n_samples, out_dir):
         data['overall_median_ise'][m] = agg[m]['_pooled_median_ise']
         data['mean_rank'][m] = float(np.mean(ranks[m]))
         data['ranks'][m] = [float(r) for r in ranks[m]]
+        data['raw_ise'][m] = {
+            dn: [float(v) for v in results[m][dn]['ise']]
+            for dn in dnames
+        }
 
     path = os.path.join(out_dir, f'mise_results_n{n_samples}.json')
     with open(path, 'w') as f:
@@ -751,7 +861,9 @@ METHOD_COLORS = {
     'KDE diffusion':      '#637939',  # dark sage
     'GMM BIC':            '#17becf',  # cyan
     'Bayesian GMM':       '#bcbd22',  # olive
+    'awkde':              '#843c39',  # dark brick
     'Neural Spline Flow': '#7f7f7f',  # gray
+    'Zuko NSF':           '#b5cf6b',  # lime green
 }
 
 METHOD_MARKERS = {
@@ -766,8 +878,26 @@ METHOD_MARKERS = {
     'KDE diffusion':      '8',
     'GMM BIC':            'h',
     'Bayesian GMM':       'p',
+    'awkde':              'H',
     'Neural Spline Flow': '*',
+    'Zuko NSF':           '2',
 }
+
+
+def _method_color(name):
+    """Look up color, stripping device tag like '(cpu)' or '(gpu)' if needed."""
+    if name in METHOD_COLORS:
+        return METHOD_COLORS[name]
+    base = name.rsplit(' (', 1)[0]
+    return METHOD_COLORS.get(base, '#333333')
+
+
+def _method_marker(name):
+    """Look up marker, stripping device tag like '(cpu)' or '(gpu)' if needed."""
+    if name in METHOD_MARKERS:
+        return METHOD_MARKERS[name]
+    base = name.rsplit(' (', 1)[0]
+    return METHOD_MARKERS.get(base, 'o')
 
 
 def fig_accuracy_vs_speed(agg, densities, methods, out_dir, n_samples):
@@ -786,13 +916,13 @@ def fig_accuracy_vs_speed(agg, densities, methods, out_dir, n_samples):
         xs.append(mean_time * 1000)
         ys.append(pooled_ise)
         ax.scatter(mean_time * 1000, pooled_ise,
-                   c=METHOD_COLORS.get(m, '#333333'),
-                   marker=METHOD_MARKERS.get(m, 'o'),
+                   c=_method_color(m),
+                   marker=_method_marker(m),
                    s=120, zorder=5, edgecolors='white', linewidths=0.5)
         # Label offset to avoid overlap
         ax.annotate(m, (mean_time * 1000, pooled_ise),
                     textcoords='offset points', xytext=(8, 4),
-                    fontsize=8, color=METHOD_COLORS.get(m, '#333333'))
+                    fontsize=8, color=_method_color(m))
 
     ax.set_xscale('log')
     ax.set_yscale('log')
@@ -954,12 +1084,12 @@ def _scatter_on_ax(ax, agg, densities, methods, n_samples):
         xs.append(mean_time * 1000)
         ys.append(pooled_ise)
         ax.scatter(mean_time * 1000, pooled_ise,
-                   c=METHOD_COLORS.get(m, '#333333'),
-                   marker=METHOD_MARKERS.get(m, 'o'),
+                   c=_method_color(m),
+                   marker=_method_marker(m),
                    s=100, zorder=5, edgecolors='white', linewidths=0.5)
         ax.annotate(m, (mean_time * 1000, pooled_ise),
                     textcoords='offset points', xytext=(8, 4),
-                    fontsize=7, color=METHOD_COLORS.get(m, '#333333'))
+                    fontsize=7, color=_method_color(m))
 
     ax.set_xscale('log')
     ax.set_yscale('log')
@@ -1032,23 +1162,30 @@ def fig_ise_violin_multi(all_ise, methods, out_dir, sample_sizes):
 
 # ── K. CLI ───────────────────────────────────────────────────────────
 
-def estimate_nsf_time(sample_sizes, mc_runs):
-    """Time a single NSF fit per sample size and print projected total."""
-    print('  Estimating NSF time...')
+def estimate_flow_time(sample_sizes, mc_runs, methods):
+    """Time a single flow fit per sample size and print projected total."""
+    flow_methods = [(n, f) for n, f, a in methods
+                    if a and (n.startswith('Neural Spline Flow')
+                              or n.startswith('Zuko NSF'))]
+    if not flow_methods:
+        return
+    print('  Estimating flow training time...')
     density = MW_DENSITIES[0]  # use Gaussian for timing
     rng = np.random.default_rng(99)
     for ns in sample_sizes:
         x = np.sort(mw_sample(ns, density, rng))
         lo, hi = mw_support(density)
         t_grid = np.linspace(lo, hi, N_GRID)
-        t0 = time.perf_counter()
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore')
-            wrap_nsf(x, t_grid)
-        single = time.perf_counter() - t0
-        total = single * mc_runs * len(MW_DENSITIES)
-        print(f'    n={ns}: {single:.1f}s/fit → ~{total/60:.0f} min total '
-              f'({mc_runs} runs × {len(MW_DENSITIES)} densities)')
+        for name, func in flow_methods:
+            t0 = time.perf_counter()
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                func(x, t_grid)
+            single = time.perf_counter() - t0
+            total = single * mc_runs * len(MW_DENSITIES)
+            print(f'    {name} n={ns}: {single:.1f}s/fit → '
+                  f'~{total/60:.0f} min total '
+                  f'({mc_runs} runs × {len(MW_DENSITIES)} densities)')
     print()
 
 
@@ -1063,7 +1200,11 @@ def main():
     parser.add_argument('--no-figures', action='store_true',
                         help='Skip figure generation')
     parser.add_argument('--no-flow', action='store_true',
-                        help='Skip Neural Spline Flow (slow)')
+                        help='Skip all normalizing flow methods (normflows + Zuko)')
+    parser.add_argument('--no-normflows', action='store_true',
+                        help='Skip normflows Neural Spline Flow')
+    parser.add_argument('--no-zuko', action='store_true',
+                        help='Skip Zuko Neural Spline Flow')
     parser.add_argument('--include-gmm', action='store_true',
                         help='Include GMM methods (excluded by default; '
                              'unfair structural advantage on MW densities)')
@@ -1091,8 +1232,10 @@ def main():
         assert abs(s - 1.0) < 1e-12, f"{d['name']}: weights sum to {s}"
 
     # Build method list
-    include_flow = not args.no_flow
-    methods = build_method_list(include_flow=include_flow,
+    inc_normflows = not (args.no_flow or args.no_normflows)
+    inc_zuko = not (args.no_flow or args.no_zuko)
+    methods = build_method_list(include_normflows=inc_normflows,
+                                include_zuko=inc_zuko,
                                 include_gmm=args.include_gmm)
 
     active = [(n, f, a) for n, f, a in methods if a]
@@ -1106,10 +1249,12 @@ def main():
           + (f', {len(missing)} skipped ({", ".join(missing)})' if missing else ''))
     print()
 
-    # NSF timing estimate (before committing to full MC loop)
-    has_nsf = any(n == 'Neural Spline Flow' and a for n, _, a in active)
-    if has_nsf and HAS_NORMFLOWS:
-        estimate_nsf_time(sample_sizes, args.mc_runs)
+    # Flow timing estimate (before committing to full MC loop)
+    has_flow = any((n.startswith('Neural Spline Flow')
+                    or n.startswith('Zuko NSF')) and a
+                   for n, _, a in active)
+    if has_flow:
+        estimate_flow_time(sample_sizes, args.mc_runs, active)
 
     # Run MC loop for each sample size
     all_agg = {}
@@ -1135,8 +1280,8 @@ def main():
         print_tables(agg, ranks, MW_DENSITIES, active, args.mc_runs, n_samples)
 
         # JSON output
-        save_json(agg, ranks, MW_DENSITIES, active, args.mc_runs, n_samples,
-                  data_dir)
+        save_json(agg, ranks, results, MW_DENSITIES, active, args.mc_runs,
+                  n_samples, data_dir)
 
     # Figures
     if not args.no_figures and HAS_MATPLOTLIB:
