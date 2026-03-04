@@ -108,6 +108,17 @@ Gray fill = true density; `sshist` (purple), `sskernel` (blue),
 
 Ten density estimation methods are evaluated on the 15 Marron-Wand (1992)
 benchmark densities ($n = 1000$, 50 Monte Carlo runs per density).
+Besides the three ssdensity methods, the comparison includes:
+
+- **KDE diffusion** -- diffusion-based plug-in bandwidth (Botev et al. 2010; `kde_diffusion`)
+- **KDEpy ISJ** -- Improved Sheather-Jones via diffusion (Nagler 2018; `KDEpy`)
+- **KDEpy Silverman** -- Silverman rule-of-thumb (`KDEpy`)
+- **scipy kde** -- Scott's rule (`scipy.stats.gaussian_kde`)
+- **statsmodels KDE** -- normal-reference bandwidth (`statsmodels`)
+- **fastkde** -- self-consistent field bandwidth (Bernacchia & Pigolotti 2011; `fastkde`)
+- **awkde** -- adaptive-width KDE with sensitivity parameter (Cranmer 2001; `awkde`)
+
+All methods use default settings for a fair comparison.
 
 ### Assessment of estimation error
 
@@ -116,8 +127,8 @@ benchmark densities ($n = 1000$, 50 Monte Carlo runs per density).
 Each violin shows the distribution of Integrated Squared Error (ISE) across
 all 750 (density, run) pairs on a log10 scale. Methods are sorted left to right
 by median ISE (white line); lower is better.
-`ssvkernel`, KDE diffusion (Botev et al. 2010), and `sskernel` form the top
-tier with the lowest medians and tightest distributions.
+`ssvkernel`, KDE diffusion, and `sskernel` form the top tier with the lowest
+medians and tightest distributions.
 
 ### Accuracy vs speed
 
