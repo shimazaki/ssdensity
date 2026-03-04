@@ -13,6 +13,12 @@ Optimal histogram and fixed or locally adaptive kernel density estimation for 1-
 pip install ssdensity
 ```
 
+For accelerated performance with Numba parallel kernels:
+
+```
+pip install ssdensity[fast]
+```
+
 Or from source:
 
 ```
@@ -20,6 +26,7 @@ pip install -e .
 ```
 
 Requires Python >= 3.9 and NumPy >= 1.24.
+The `[fast]` extra adds Numba and SciPy for parallel computation.
 
 ## Quick start
 
@@ -86,7 +93,7 @@ The `_classic` variants are provided for reference and reproducibility.
 All three methods on the 15 standard benchmark densities
 (Marron & Wand, 1992):
 
-![Marron-Wand densities](benchmarks/marron_wand/compare_methods_optimized.png)
+![Marron-Wand densities](https://raw.githubusercontent.com/shimazaki/ssdensity/master/benchmarks/marron_wand/compare_methods_optimized.png)
 
 Gray fill = true density; `sshist` (purple), `sskernel` (blue),
 `ssvkernel` (orange) ($n = 1000$). Each subplot shows ISE and wall time.
@@ -104,7 +111,7 @@ benchmark densities ($n = 1000$, 50 Monte Carlo runs per density).
 
 ### Assessment of estimation error
 
-![ISE violin](benchmarks/performance_comparison/fig/ise_violin.png)
+![ISE violin](https://raw.githubusercontent.com/shimazaki/ssdensity/master/benchmarks/performance_comparison/fig/ise_violin.png)
 
 Each violin shows the distribution of Integrated Squared Error (ISE) across
 all 750 (density, run) pairs on a log10 scale. Methods are sorted left to right
@@ -117,7 +124,7 @@ tier with the lowest medians and tightest distributions.
 Speed or accuracy? `sskernel` is both fast and accurate.
 For the best accuracy on complex shapes, `ssvkernel` wins.
 
-![Accuracy vs Speed](benchmarks/performance_comparison/fig/accuracy_vs_speed.png)
+![Accuracy vs Speed](https://raw.githubusercontent.com/shimazaki/ssdensity/master/benchmarks/performance_comparison/fig/accuracy_vs_speed.png)
 
 Pooled median ISE (y-axis, log scale) versus mean computation time per
 fit-and-evaluate call (x-axis, log scale). The left panel shows CPU time
@@ -130,7 +137,7 @@ time on a multi-core machine, because NumPy's FFT (pocketfft) and BLAS
 
 ### Error by method and density
 
-![MISE heatmap](benchmarks/performance_comparison/fig/mise_heatmap.png)
+![MISE heatmap](https://raw.githubusercontent.com/shimazaki/ssdensity/master/benchmarks/performance_comparison/fig/mise_heatmap.png)
 
 Median ISE ($\times 10^{-3}$) for each method-density pair, sorted by
 pooled median ISE (best at top). Darker cells indicate lower (better)
@@ -209,9 +216,13 @@ and `python benchmarks/speed_comparison/classic_vs_optimized.py`
 
 ## Authors
 
-- Hideaki Shimazaki (shimazaki.hideaki.8x@kyoto-u.jp) -- [shimazaki](https://github.com/shimazaki) on GitHub
+- Hideaki Shimazaki (shimazaki.hideaki.8x@kyoto-u.jp) -- [shimazaki](https://github.com/shimazaki) on GitHub (maintainer)
 - Lee A.D. Cooper (cooperle@gmail.com) -- [cooperlab](https://github.com/cooperlab) on GitHub
 - Subhasis Ray (ray.subhasis@gmail.com)
+
+The original Python code was created by Cooper and Ray based on the
+[MATLAB code](https://github.com/shimazaki/density_estimation) developed
+by Shimazaki.
 
 ## License
 

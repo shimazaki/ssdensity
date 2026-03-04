@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ssdensity"
+dynamic = ["version"]
+description = "Optimal histogram and fixed or locally adaptive kernel density estimation"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.9"
+authors = [
+    { name = "Hideaki Shimazaki", email = "shimazaki.hideaki.8x@kyoto-u.jp" },
+    { name = "Lee A.D. Cooper", email = "cooperle@gmail.com" },
+    { name = "Subhasis Ray", email = "ray.subhasis@gmail.com" },
+]
+maintainers = [
+    { name = "Hideaki Shimazaki", email = "shimazaki.hideaki.8x@kyoto-u.jp" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+keywords = ["density estimation", "kernel density", "histogram", "bandwidth selection", "adaptive"]
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+fast = ["numba>=0.57", "scipy>=1.10"]
+
+[project.urls]
+Homepage = "https://github.com/shimazaki/ssdensity"
+Repository = "https://github.com/shimazaki/ssdensity"
+Issues = "https://github.com/shimazaki/ssdensity/issues"
+
+[tool.setuptools_scm]
+
+[tool.setuptools.packages.find]
+include = ["ssdensity*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
