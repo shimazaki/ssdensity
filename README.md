@@ -93,12 +93,16 @@ Gray fill = true density; `sshist` (purple), `sskernel` (blue),
 `ssvkernel` tracks fine structure (#10 Claw, #15 Discrete comb) that
 `sskernel` smooths over.
 
+> J. S. Marron and M. P. Wand, "Exact mean integrated squared error,"
+> *The Annals of Statistics* 20(2): 712-736, 1992.
+> [doi:10.1214/aos/1176348653](https://doi.org/10.1214/aos/1176348653)
+
 ## Comparison of methods
 
 Ten density estimation methods are evaluated on the 15 Marron-Wand (1992)
 benchmark densities ($n = 1000$, 50 Monte Carlo runs per density).
 
-### ISE distribution
+### Assessment of estimation error
 
 ![ISE violin](benchmarks/performance_comparison/fig/ise_violin.png)
 
@@ -124,7 +128,7 @@ multi-threading: `sskernel` and `ssvkernel` use ~100x more CPU cycles than wall
 time on a multi-core machine, because NumPy's FFT (pocketfft) and BLAS
 (OpenBLAS) parallelize automatically.
 
-### MISE heatmap
+### Error by method and density
 
 ![MISE heatmap](benchmarks/performance_comparison/fig/mise_heatmap.png)
 
@@ -140,7 +144,7 @@ locally adaptive bandwidth: #3 Strongly skewed, #4 Kurtotic unimodal,
 12 of 15 densities. Together, the two kernel methods maintain
 consistently low error across all 15 densities.
 
-### Computation speed
+### Speed improvement
 
 Optimized from the original
 [AdaptiveKDE](https://github.com/shimazaki/AdaptiveKDE)
@@ -167,10 +171,6 @@ Reproduce: `python benchmarks/performance_comparison/run_mise_comparison.py`
 and `python benchmarks/classic_vs_optimized.py`
 
 ## References
-
-- J. S. Marron and M. P. Wand, "Exact mean integrated squared error,"
-  *The Annals of Statistics* 20(2): 712-736, 1992.
-  [doi:10.1214/aos/1176348653](https://doi.org/10.1214/aos/1176348653)
 
 - H. Shimazaki and S. Shinomoto, "A method for selecting the bin size of
   a time histogram," *Neural Computation* 19(6): 1503-1527, 2007.
