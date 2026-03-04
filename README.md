@@ -133,22 +133,23 @@ Reproduce: `python benchmarks/performance_comparison/run_mise_comparison.py`
 
 ### Computation speed
 
-Median wall time on Marron-Wand #1 Gaussian (*n* = 1000, 20 runs,
-2x Xeon 6258R / 112 threads):
+Median wall time on Marron-Wand #1 Gaussian (*n* = 1000, 3 warmup + 20
+measured runs, 2x Xeon 6258R / 112 threads):
 
 | Function | Classic (ms) | Optimized (ms) | Speedup |
 |----------|-------------|----------------|---------|
-| `sshist` | 1779 | 5.3 | 334x |
-| `sskernel` | 67 | 37 | 2x |
-| `ssvkernel` | 3443 | 505 | 7x |
+| `sshist` | 750 | 3.0 | 248x |
+| `sskernel` | 47 | 22 | 2x |
+| `ssvkernel` | 2616 | 482 | 5x |
 
 - **sshist**: Numba JIT with parallel outer loop (`prange`) over candidate
-  bin counts; replaces per-shift `np.histogram` with `searchsorted`
-- **sskernel**: Real FFT (`rfft`/`irfft`) halves transform size vs complex
-  FFT; batched bootstrap FFTs in a single array call
+  bin counts; replaces per-shift `np.histogram` with vectorized
+  `searchsorted`
+- **sskernel**: Real FFT (`rfft`/`irfft`) halves transform size versus
+  complex FFT; batched bootstrap FFTs in a single 2-D array call
 - **ssvkernel**: Batched FFTs grouped by padded length (~6400 individual
-  FFTs → ~3 forward + ~80 inverse); vectorized Nadaraya-Watson kernel
-  regression via broadcasting; vectorized bootstrap loop
+  FFTs &rarr; ~3 forward + ~80 inverse); vectorized Nadaraya&ndash;Watson
+  kernel regression via broadcasting; vectorized bootstrap loop
 
 Reproduce: `python benchmarks/classic_vs_optimized.py`
 
