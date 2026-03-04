@@ -168,7 +168,7 @@ measured runs, $2\times$ Xeon 6258R / 112 threads):
   kernel regression via broadcasting; vectorized bootstrap loop
 
 Reproduce: `python benchmarks/performance_comparison/run_mise_comparison.py`
-and `python benchmarks/classic_vs_optimized.py`
+and `python benchmarks/speed_comparison/classic_vs_optimized.py`
 
 ## References
 
