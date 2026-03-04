@@ -38,26 +38,26 @@ y, t, optw, gs, C, confb95, yb = ssvkernel(x)
 
 ### 1. `sshist` -- optimal histogram bin width
 
-Selects the number of bins *N* (equivalently, bin width
-*&Delta;* = (*x*<sub>max</sub> &minus; *x*<sub>min</sub>) / *N*) by
-minimizing the mean integrated squared error (MISE) between the histogram
-and the unknown underlying event rate:
+Selects the number of bins $N$ (equivalently, bin width
+$\Delta = (x_{\max} - x_{\min}) / N$) by minimizing the mean integrated
+squared error (MISE) between the histogram and the unknown underlying
+event rate:
 
-> *C*<sub>*n*</sub>(*&Delta;*) = (2*k&#x0304;* &minus; *v*) / *&Delta;*<sup>2</sup>
+$$C_n(\Delta) = \frac{2\bar{k} - v}{\Delta^2}$$
 
-where *k&#x0304;* and *v* are the mean and (biased) variance of the
-event counts across bins. See
+where $\bar{k}$ and $v$ are the mean and (biased) variance of the event
+counts across bins. See
 [neuralengine.org/res/histogram](https://www.neuralengine.org/res/histogram.html)
 for further information.
 
 ### 2. `sskernel` -- fixed-bandwidth kernel density estimation
 
-Estimates a globally optimal Gaussian bandwidth *w* by minimizing the
+Estimates a globally optimal Gaussian bandwidth $w$ by minimizing the
 cost function derived from the MISE (Shimazaki & Shinomoto, 2010):
 
-> *C*(*w*) = &sum;<sub>*i,j*</sub> &int; *k*<sub>*w*</sub>(*x* &minus; *x*<sub>*i*</sub>) *k*<sub>*w*</sub>(*x* &minus; *x*<sub>*j*</sub>) d*x* &minus; 2 &sum;<sub>*i* &ne; *j*</sub> *k*<sub>*w*</sub>(*x*<sub>*i*</sub> &minus; *x*<sub>*j*</sub>)
+$$C(w) = \sum_{i,j} \int k_w(x - x_i)\, k_w(x - x_j)\, dx - 2 \sum_{i \neq j} k_w(x_i - x_j)$$
 
-where *k*<sub>*w*</sub> is a Gaussian kernel with bandwidth *w*. See
+where $k_w$ is a Gaussian kernel with bandwidth $w$. See
 [neuralengine.org/res/kernel](https://www.neuralengine.org/res/kernel.html)
 for further information.
 
@@ -65,8 +65,8 @@ for further information.
 
 Extends `sskernel` by allowing the bandwidth to vary as a function of
 location. At each point, the locally optimal bandwidth is selected by
-minimizing the same *L*<sub>2</sub> cost evaluated within a local window.
-A stiffness parameter *&gamma;* (0 &lt; *&gamma;* &le; 1) controls the
+minimizing the same $L_2$ cost evaluated within a local window.
+A stiffness parameter $\gamma$ ($0 < \gamma \leq 1$) controls the
 trade-off between local adaptivity and global smoothness; it is optimized
 via golden-section search. See
 [neuralengine.org/res/kernel](https://www.neuralengine.org/res/kernel.html) for further information.
@@ -83,18 +83,20 @@ The `_classic` variants are provided for reference and reproducibility.
 
 ## Marron-Wand benchmark densities
 
+All three methods on the 15 standard benchmark densities
+(Marron & Wand, 1992):
+
 ![Marron-Wand densities](benchmarks/marron_wand/compare_methods_optimized.png)
 
-The 15 Marron-Wand (1992) benchmark densities (gray fill = true density) with
-`sshist` (purple), `sskernel` (blue), and `ssvkernel` (orange) overlaid
-(*n* = 1000). Each subplot shows ISE and computation time. The locally adaptive
-`ssvkernel` tracks fine structure (e.g., #10 Claw, #15 Discrete comb) that the
-fixed-bandwidth `sskernel` smooths over.
+Gray fill = true density; `sshist` (purple), `sskernel` (blue),
+`ssvkernel` (orange) ($n = 1000$). Each subplot shows ISE and wall time.
+`ssvkernel` tracks fine structure (#10 Claw, #15 Discrete comb) that
+`sskernel` smooths over.
 
 ## Comparison of methods
 
 Ten density estimation methods are evaluated on the 15 Marron-Wand (1992)
-benchmark densities (*n* = 1000, 50 Monte Carlo runs per density).
+benchmark densities ($n = 1000$, 50 Monte Carlo runs per density).
 
 ### ISE distribution
 
@@ -107,6 +109,9 @@ by median ISE (white line); lower is better.
 tier with the lowest medians and tightest distributions.
 
 ### Accuracy vs speed
+
+Speed or accuracy? `sskernel` is both fast and accurate.
+For the best accuracy on complex shapes, `ssvkernel` wins.
 
 ![Accuracy vs Speed](benchmarks/performance_comparison/fig/accuracy_vs_speed.png)
 
@@ -123,18 +128,25 @@ time on a multi-core machine, because NumPy's FFT (pocketfft) and BLAS
 
 ![MISE heatmap](benchmarks/performance_comparison/fig/mise_heatmap.png)
 
-Median ISE (x10^-3) for each method-density pair, sorted by pooled median ISE
-(best at top). Darker cells indicate lower (better) error. The hardest
-densities -- #3 Strongly skewed, #5 Outlier, #14 Smooth comb, #15 Discrete
-comb -- separate methods most clearly. `sskernel`, `ssvkernel`, and KDE
-diffusion maintain consistently low error across all 15 densities.
+Median ISE ($\times 10^{-3}$) for each method-density pair, sorted by
+pooled median ISE (best at top). Darker cells indicate lower (better)
+error.
 
-Reproduce: `python benchmarks/performance_comparison/run_mise_comparison.py`
+`ssvkernel` achieves the best median ISE overall and ranks first on 6 of
+the 15 densities — specifically, the most challenging shapes that require
+locally adaptive bandwidth: #3 Strongly skewed, #4 Kurtotic unimodal,
+#12 Asymmetric claw, #13 Asymmetric double claw, #14 Smooth comb, and
+#15 Discrete comb. `sskernel` wins #10 Claw and places in the top 3 on
+12 of 15 densities. Together, the two kernel methods maintain
+consistently low error across all 15 densities.
 
 ### Computation speed
 
-Median wall time on Marron-Wand #1 Gaussian (*n* = 1000, 3 warmup + 20
-measured runs, 2x Xeon 6258R / 112 threads):
+Optimized from the original
+[AdaptiveKDE](https://github.com/shimazaki/AdaptiveKDE)
+([PyPI: adaptivekde](https://pypi.org/project/adaptivekde/)).
+Median wall time on Marron-Wand #1 Gaussian ($n = 1000$, 3 warmup + 20
+measured runs, $2\times$ Xeon 6258R / 112 threads):
 
 | Function | Classic (ms) | Optimized (ms) | Speedup |
 |----------|-------------|----------------|---------|
@@ -151,10 +163,14 @@ measured runs, 2x Xeon 6258R / 112 threads):
   FFTs &rarr; ~3 forward + ~80 inverse); vectorized Nadaraya&ndash;Watson
   kernel regression via broadcasting; vectorized bootstrap loop
 
-Reproduce: `python benchmarks/classic_vs_optimized.py`
-
+Reproduce: `python benchmarks/performance_comparison/run_mise_comparison.py`
+and `python benchmarks/classic_vs_optimized.py`
 
 ## References
+
+- J. S. Marron and M. P. Wand, "Exact mean integrated squared error,"
+  *The Annals of Statistics* 20(2): 712-736, 1992.
+  [doi:10.1214/aos/1176348653](https://doi.org/10.1214/aos/1176348653)
 
 - H. Shimazaki and S. Shinomoto, "A method for selecting the bin size of
   a time histogram," *Neural Computation* 19(6): 1503-1527, 2007.
