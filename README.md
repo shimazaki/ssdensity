@@ -217,10 +217,12 @@ and `python benchmarks/speed_comparison/classic_vs_optimized.py`
 ## Authors
 
 - Hideaki Shimazaki (shimazaki.hideaki.8x@kyoto-u.jp) -- [shimazaki](https://github.com/shimazaki) on GitHub (maintainer)
+
+The [original Python code](https://github.com/cooperlab/AdaptiveKDE) ([PyPI: adaptivekde](https://pypi.org/project/adaptivekde/)) was created by
 - Lee A.D. Cooper (cooperle@gmail.com) -- [cooperlab](https://github.com/cooperlab) on GitHub
 - Subhasis Ray (ray.subhasis@gmail.com)
 
-The original Python code was created by Cooper and Ray based on the
+based on the
 [MATLAB code](https://github.com/shimazaki/density_estimation) developed
 by Shimazaki.
 
