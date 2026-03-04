@@ -196,9 +196,9 @@ def timed_run(func, n_repeats=N_REPEATS):
     result = None
     for _ in range(n_repeats):
         np.random.seed(0)
-        t0 = time.process_time()
+        t0 = time.perf_counter()
         result = func()
-        t1 = time.process_time()
+        t1 = time.perf_counter()
         times.append(t1 - t0)
     return result, np.median(times)
 
@@ -442,7 +442,7 @@ def fig_compare_optimized(results, path):
 # ── Summary tables ───────────────────────────────────────────────────
 
 def print_summary(results):
-    """Print ISE and CPU time tables to stdout."""
+    """Print ISE and wall time tables to stdout."""
     header = (f'{"Density":<25s}  {"sskernel":>10s} {"classic":>10s}'
               f'  {"ssvkernel":>10s} {"classic":>10s}'
               f'  {"sshist":>10s} {"classic":>10s}')
@@ -457,7 +457,7 @@ def print_summary(results):
         print(f'{rec["name"]:<25s}  {vals[0]} {vals[1]}'
               f'  {vals[2]} {vals[3]}  {vals[4]} {vals[5]}')
 
-    print('\nCPU time (ms)')
+    print('\nWall time (ms)')
     print(header)
     print('-' * len(header))
     for rec in results:
