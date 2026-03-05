@@ -120,6 +120,12 @@ Besides the three ssdensity methods, the comparison includes:
 
 All methods use default settings for a fair comparison.
 
+### Example fits on challenging densities
+
+![Density overlay](https://raw.githubusercontent.com/shimazaki/ssdensity/master/benchmarks/performance_comparison/fig/density_overlay.png)
+
+Three representative Marron–Wand densities (n=1000): #3 Strongly skewed (8 cascading components), #10 Claw (narrow spikes on a broad mode), and #14 Smooth comb (6 components at different scales). The gray fill shows the true density. `ssvkernel` (orange) closely tracks the true shape, while KDE diffusion slightly over-smooths the fine structure and `awkde` misses it entirely.
+
 ### Assessment of estimation error
 
 ![ISE violin](https://raw.githubusercontent.com/shimazaki/ssdensity/master/benchmarks/performance_comparison/fig/ise_violin.png)
@@ -141,10 +147,14 @@ Pooled median ISE (y-axis, log scale) versus mean computation time per
 fit-and-evaluate call (x-axis, log scale). The left panel shows CPU time
 (`time.process_time`, summed across all threads); the right panel shows wall
 time (`time.perf_counter`). Points closer to the lower-left corner are both
-more accurate and faster. The gap between CPU and wall time reveals implicit
-multi-threading: `sskernel` and `ssvkernel` use ~100x more CPU cycles than wall
-time on a multi-core machine, because NumPy's FFT (pocketfft) and BLAS
-(OpenBLAS) parallelize automatically.
+more accurate and faster.
+
+**Note on CPU time vs wall time:** NumPy is linked against Intel MKL, which
+parallelizes both BLAS operations and element-wise math (via VML) across all
+available cores. Methods that rely on large array operations (e.g., KDE
+diffusion, `sshist`) can show CPU time much higher than wall time because MKL
+spreads the work across many threads. Wall time is the more meaningful metric
+for end-user latency.
 
 ### Error by method and density
 

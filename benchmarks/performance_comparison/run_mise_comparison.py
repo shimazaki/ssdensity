@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """MISE performance comparison: ssdensity vs state-of-the-art density estimators.
 
-Evaluates 14 methods on the 15 Marron-Wand (1992) benchmark densities via
+Evaluates 17 methods on the 15 Marron-Wand (1992) benchmark densities via
 Monte Carlo estimation of Median Integrated Squared Error. All methods
 use default settings for a fair comparison.
 
@@ -20,6 +20,9 @@ Methods:
  12. Bayesian GMM    — sklearn Variational DP
  13. Neural Spline Flow — normflows, Adam optimizer
  14. Zuko NSF        — zuko neural spline flow, Adam optimizer
+ 15. Zuko UNAF       — zuko UMNN autoregressive flow, Adam optimizer
+ 16. ARF             — adversarial random forest (arfpy), forde density
+ 17. TransportMap    — polynomial transport map (TransportMaps), KL fit
 
 Fairness note:
   The Marron-Wand densities are all finite Gaussian mixtures. GMM-based methods
@@ -28,6 +31,9 @@ Fairness note:
   not generalize to non-Gaussian-mixture densities (e.g., uniform, beta,
   log-normal, heavy-tailed). KDE and histogram methods make no parametric
   assumption and are expected to be more robust across arbitrary densities.
+  ARF trains a random forest discriminator, which has a structural advantage on
+  data that random forests can partition well (e.g., multimodal). TransportMap
+  uses polynomial basis, which may underfit highly multimodal densities.
 
 References:
   Marron, J. S. and Wand, M. P. (1992). "Exact Mean Integrated Squared Error,"
@@ -43,11 +49,13 @@ import argparse
 import json
 import os
 import platform
+import re
 import sys
 import time
 import warnings
 
 import numpy as np
+from tqdm import tqdm
 
 # ── A. Imports + optional package detection ──────────────────────────
 
@@ -118,6 +126,28 @@ try:
 except ImportError:
     HAS_ZUKO = False
 
+# arfpy needs np.in1d monkey-patch for NumPy 2.0+
+try:
+    import numpy as _np_check
+    if not hasattr(_np_check, 'in1d'):
+        _np_check.in1d = _np_check.isin
+    from arfpy import arf as arf_module
+    import pandas as pd
+    HAS_ARF = True
+except ImportError:
+    HAS_ARF = False
+
+try:
+    import TransportMaps as TM
+    import TransportMaps.Maps as TM_MAPS
+    import TransportMaps.Distributions as TM_DIST
+    import TransportMaps.KL as TM_KL
+    import logging as _tm_logging
+    TM.setLogLevel(_tm_logging.WARNING)
+    HAS_TRANSPORTMAPS = True
+except ImportError:
+    HAS_TRANSPORTMAPS = False
+
 try:
     import matplotlib
     matplotlib.use('Agg')
@@ -133,19 +163,31 @@ except ImportError:
 N_GRID = 1024       # evaluation grid points
 MW_MARGIN = 5       # support margin in sigma units
 GMM_MAX_K = 15      # max components for BIC search
-NSF_LAYERS = 8      # number of NSF flow layers
-NSF_HIDDEN = 64     # hidden units per layer
+NSF_LAYERS = 3      # number of NSF flow layers
+NSF_HIDDEN = 32     # hidden units per layer
 NSF_BINS = 8        # rational-quadratic spline bins
 NSF_EPOCHS = 300    # training epochs
 NSF_LR = 5e-4       # learning rate
 NSF_BATCH = 256     # batch size
 
-ZUKO_TRANSFORMS = 8   # number of spline transforms
-ZUKO_HIDDEN = (64, 64) # hidden features per transform
+ZUKO_TRANSFORMS = 3   # number of spline transforms
+ZUKO_HIDDEN = (32, 32) # hidden features per transform
 ZUKO_BINS = 8          # rational-quadratic spline bins
 ZUKO_EPOCHS = 300      # training epochs
 ZUKO_LR = 5e-4         # learning rate
 ZUKO_BATCH = 256       # batch size
+
+# Zuko UNAF (UMNN-based flow)
+UNAF_TRANSFORMS = 8
+UNAF_HIDDEN = (64, 64)
+UNAF_SIGNAL = 16
+UNAF_EPOCHS = 300
+UNAF_LR = 5e-4
+UNAF_BATCH = 256
+
+# TransportMap
+TM_ORDER = 10       # polynomial order
+TM_TOL = 1e-4       # optimization tolerance
 
 
 # ── C. Marron-Wand density definitions ───────────────────────────────
@@ -497,10 +539,157 @@ def wrap_zuko_nsf(x, t_grid):
     return y
 
 
+def wrap_zuko_unaf(x, t_grid):
+    """UMNN Autoregressive Flow (1D) with zuko.
+
+    Uses GPU if available; falls back to single-threaded CPU.
+    Data is standardized before training.
+    """
+    device = _get_torch_device()
+    if device.type == 'cpu':
+        torch.set_num_threads(1)
+
+    x_mean, x_std = float(np.mean(x)), float(np.std(x))
+    if x_std < 1e-12:
+        x_std = 1.0
+    x_normed = (x - x_mean) / x_std
+
+    flow = zuko.flows.UNAF(
+        features=1, context=0,
+        transforms=UNAF_TRANSFORMS,
+        hidden_features=UNAF_HIDDEN,
+        signal=UNAF_SIGNAL,
+    ).to(device)
+
+    optimizer = torch.optim.Adam(flow.parameters(), lr=UNAF_LR)
+    x_tensor = torch.tensor(
+        x_normed.reshape(-1, 1), dtype=torch.float32, device=device)
+    n = len(x)
+
+    flow.train()
+    for _ in range(UNAF_EPOCHS):
+        idx = torch.randperm(n, device=device)[:UNAF_BATCH]
+        loss = -flow().log_prob(x_tensor[idx]).mean()
+        if torch.isnan(loss) or torch.isinf(loss):
+            continue
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    flow.eval()
+    t_normed = (t_grid - x_mean) / x_std
+    t_tensor = torch.tensor(
+        t_normed.reshape(-1, 1), dtype=torch.float32, device=device)
+    with torch.no_grad():
+        log_prob = flow().log_prob(t_tensor)
+        y = torch.exp(log_prob).cpu().numpy().flatten() / x_std
+    y = np.maximum(y, 0.0)
+    return y
+
+
+def wrap_arf(x, t_grid):
+    """Adversarial Random Forest density estimation (arfpy).
+
+    Fits ARF, estimates leaf-level truncated normal params via forde(),
+    then evaluates density at t_grid by averaging across trees.
+    """
+    from scipy.stats import truncnorm
+
+    df = pd.DataFrame({'x': x})
+    my_arf = arf_module.arf(x=df, verbose=False)
+    params = my_arf.forde()
+
+    cnt = params['cnt']
+    forest = params['forest']
+    n_real = len(x)
+
+    # Apply ORIGINAL data to forest for correct leaf weights
+    orig_leaf_ids = forest.apply(x.reshape(-1, 1))
+    query_leaf_ids = forest.apply(t_grid.reshape(-1, 1))
+    n_trees = forest.n_estimators
+    y = np.zeros(len(t_grid))
+
+    for tree_idx in range(n_trees):
+        tree_cnt = cnt[cnt['tree'] == tree_idx].set_index('nodeid')
+        q_leaves = query_leaf_ids[:, tree_idx]
+        o_leaves = orig_leaf_ids[:, tree_idx]
+
+        # Count original data per leaf
+        leaf_counts = {}
+        for lid in np.unique(o_leaves):
+            leaf_counts[lid] = np.sum(o_leaves == lid)
+
+        for leaf_id in np.unique(q_leaves):
+            if leaf_id not in tree_cnt.index:
+                continue
+            row = tree_cnt.loc[leaf_id]
+            mu, sd = float(row['mean']), float(row['sd'])
+            lo, hi = float(row['min']), float(row['max'])
+            mask = q_leaves == leaf_id
+
+            leaf_weight = leaf_counts.get(leaf_id, 0) / n_real
+            if leaf_weight == 0:
+                continue
+
+            if np.isinf(lo):
+                lo = mu - 10 * sd
+            if np.isinf(hi):
+                hi = mu + 10 * sd
+            if sd < 1e-12:
+                sd = 1e-12
+
+            a, b = (lo - mu) / sd, (hi - mu) / sd
+            pdf_vals = truncnorm.pdf(t_grid[mask], a, b, loc=mu, scale=sd)
+            y[mask] += leaf_weight * pdf_vals
+
+    y /= n_trees
+    y = np.maximum(y, 0.0)
+    return y
+
+
+def wrap_transportmaps(x, t_grid):
+    """Transport map density estimation (TransportMaps).
+
+    Constructs a monotone polynomial transport map pushing data to
+    standard normal, then evaluates the pullback density.
+    """
+    rho = TM_DIST.StandardNormalDistribution(1)
+
+    # Scale data to [-4, 4] range
+    xmin, xmax = x.min(), x.max()
+    margin = 0.1 * (xmax - xmin)
+    xmin -= margin
+    xmax += margin
+    a_coeff = 4.0 * (xmin + xmax) / (xmin - xmax)
+    b_coeff = 8.0 / (xmax - xmin)
+    x_scaled = a_coeff + b_coeff * x
+
+    # Build transport map
+    S = TM_MAPS.assemble_IsotropicIntegratedExponentialTriangularTransportMap(
+        1, TM_ORDER, 'total')
+    pull = TM_DIST.PullBackParametricTransportMapDistribution(S, rho)
+
+    # Fit by minimizing KL divergence
+    pi = TM_DIST.DistributionFromSamples(x_scaled.reshape(-1, 1))
+    TM_KL.minimize_kl_divergence(
+        pi, pull,
+        qtype=0, qparams=len(x),
+        tol=TM_TOL, ders=2)
+
+    # Evaluate density
+    t_scaled = a_coeff + b_coeff * t_grid
+    push = TM_DIST.PullBackTransportMapDistribution(S, rho)
+    log_pdf = push.log_pdf(t_scaled.reshape(-1, 1))
+    y = np.exp(log_pdf) * abs(b_coeff)
+    y = np.maximum(y, 0.0)
+    return y
+
+
 # ── F. Method registry ──────────────────────────────────────────────
 
 def build_method_list(include_normflows=True, include_zuko=True,
-                      include_gmm=False):
+                      include_gmm=False, include_zuko_unaf=True,
+                      include_arf=True, include_transportmaps=True):
     """Build list of (name, wrapper, available) tuples."""
     methods = [
         ('sskernel',        wrap_sskernel,        True),
@@ -522,18 +711,132 @@ def build_method_list(include_normflows=True, include_zuko=True,
         methods.append((f'Neural Spline Flow {tag}', wrap_nsf, HAS_NORMFLOWS))
     if include_zuko:
         methods.append((f'Zuko NSF {tag}',        wrap_zuko_nsf,        HAS_ZUKO))
+    if include_zuko_unaf:
+        methods.append((f'Zuko UNAF {tag}', wrap_zuko_unaf, HAS_ZUKO))
+    if include_arf:
+        methods.append(('ARF', wrap_arf, HAS_ARF))
+    if include_transportmaps:
+        methods.append(('TransportMap', wrap_transportmaps, HAS_TRANSPORTMAPS))
     return methods
+
+
+# ── G0. Per-method result caching ─────────────────────────────────────
+
+CACHE_VERSION = 1
+
+
+def _nan_to_json(v):
+    """Convert NaN values in nested dicts/lists to None for JSON."""
+    if isinstance(v, float) and np.isnan(v):
+        return None
+    if isinstance(v, dict):
+        return {k: _nan_to_json(val) for k, val in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_nan_to_json(x) for x in v]
+    return v
+
+
+def _json_to_nan(v):
+    """Convert None values back to float('nan') after JSON load."""
+    if v is None:
+        return float('nan')
+    if isinstance(v, dict):
+        return {k: _json_to_nan(val) for k, val in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_json_to_nan(x) for x in v]
+    return v
+
+
+def _sanitize_method_name(name):
+    """Lowercase, replace non-alphanumeric with underscore."""
+    return re.sub(r'[^a-z0-9]+', '_', name.lower()).strip('_')
+
+
+def _cache_path(cache_dir, method_name, n_samples, mc_runs):
+    """Build cache file path for one method."""
+    safe = _sanitize_method_name(method_name)
+    return os.path.join(cache_dir, f'{safe}_n{n_samples}_mc{mc_runs}.json')
+
+
+def save_method_cache(cache_dir, name, method_results, n_samples, mc_runs):
+    """Write one method's results to a JSON cache file."""
+    os.makedirs(cache_dir, exist_ok=True)
+    data = {
+        'cache_version': CACHE_VERSION,
+        'method_name': name,
+        'n_samples': n_samples,
+        'mc_runs': mc_runs,
+        'n_grid': N_GRID,
+        'seed': 42,
+        'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
+        'densities': _nan_to_json(method_results),
+    }
+    path = _cache_path(cache_dir, name, n_samples, mc_runs)
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=2)
+
+
+def load_method_cache(cache_dir, name, n_samples, mc_runs, densities):
+    """Load + validate cache for one method. Returns dict or None."""
+    path = _cache_path(cache_dir, name, n_samples, mc_runs)
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
+
+    # Validate metadata
+    if data.get('cache_version') != CACHE_VERSION:
+        return None
+    if data.get('method_name') != name:
+        return None
+    if data.get('n_samples') != n_samples:
+        return None
+    if data.get('mc_runs') != mc_runs:
+        return None
+    if data.get('n_grid') != N_GRID:
+        return None
+
+    cached = data.get('densities')
+    if not isinstance(cached, dict):
+        return None
+
+    # Check all density keys present with correct array lengths
+    for d in densities:
+        dname = d['name']
+        if dname not in cached:
+            return None
+        entry = cached[dname]
+        if not isinstance(entry, dict):
+            return None
+        for key in ('ise', 'wall_time', 'cpu_time'):
+            if key not in entry:
+                return None
+            if not isinstance(entry[key], list) or len(entry[key]) != mc_runs:
+                return None
+
+    return _json_to_nan(cached)
 
 
 # ── G. Monte Carlo loop ─────────────────────────────────────────────
 
-def run_mc(mc_runs, n_samples, methods, densities, verbose=True):
+def run_mc(mc_runs, n_samples, methods, densities, verbose=True,
+           cache_dir=None, force_rerun=False, force_methods=None):
     """Run MC simulation. Returns dict of results per method per density.
+
+    If cache_dir is set, loads previously computed per-method results from
+    JSON cache files and only re-runs methods that are missing or forced.
 
     Returns:
         results: {method_name: {density_name: {'ise': [...], 'time': [...]}}}
     """
-    n_methods = len(methods)
+    if force_methods is None:
+        force_methods = set()
+    else:
+        force_methods = set(force_methods)
+
     n_densities = len(densities)
     total = n_densities * mc_runs
 
@@ -544,16 +847,53 @@ def run_mc(mc_runs, n_samples, methods, densities, verbose=True):
         for d in densities:
             results[name][d['name']] = {'ise': [], 'wall_time': [], 'cpu_time': []}
 
+    # ── Try loading from cache ──
+    cached_methods = set()
+    if cache_dir and not force_rerun:
+        for name, _, avail in methods:
+            if not avail:
+                continue
+            if name in force_methods:
+                continue
+            cached = load_method_cache(
+                cache_dir, name, n_samples, mc_runs, densities)
+            if cached is not None:
+                results[name] = cached
+                cached_methods.add(name)
+
+    # Determine which methods still need computation
+    compute_methods = [(n, f, a) for n, f, a in methods
+                       if a and n not in cached_methods]
+
+    if verbose and cached_methods:
+        print(f'  Cache: loaded {len(cached_methods)} method(s) from '
+              f'{cache_dir}')
+        for m in sorted(cached_methods):
+            print(f'    ✓ {m}')
+    if verbose and compute_methods:
+        print(f'  Computing {len(compute_methods)} method(s)...')
+
+    # If everything is cached, skip MC loop entirely
+    if not compute_methods:
+        if verbose:
+            print('  All methods loaded from cache — skipping MC loop.')
+        return results
+
     # Master seed sequence for reproducibility
     ss = np.random.SeedSequence(42)
     run_seeds = ss.spawn(mc_runs)
 
-    done = 0
+    n_compute = len(compute_methods)
+    total_steps = n_densities * mc_runs * n_compute
+    pbar = tqdm(total=total_steps, desc='  MC', unit='fit',
+                disable=not verbose, dynamic_ncols=True)
     for run_idx in range(mc_runs):
         rng = np.random.default_rng(run_seeds[run_idx])
 
         for d_idx, density in enumerate(densities):
             # Draw sample (same for all methods this run)
+            # NOTE: mw_sample must be called even if some methods are cached,
+            # to keep RNG state synchronized across runs.
             x_raw = mw_sample(n_samples, density, rng)
             x_sorted = np.sort(x_raw)
 
@@ -564,9 +904,10 @@ def run_mc(mc_runs, n_samples, methods, densities, verbose=True):
             t_grid = np.linspace(lo, hi, N_GRID)
             f_true = mw_pdf(t_grid, density)
 
-            for name, func, avail in methods:
-                if not avail:
-                    continue
+            for name, func, avail in compute_methods:
+                pbar.set_postfix_str(
+                    f'run {run_idx+1}/{mc_runs}  '
+                    f'{density["name"]}  {name}', refresh=True)
                 try:
                     with warnings.catch_warnings():
                         warnings.simplefilter('ignore')
@@ -583,18 +924,17 @@ def run_mc(mc_runs, n_samples, methods, densities, verbose=True):
                     results[name][density['name']]['ise'].append(np.nan)
                     results[name][density['name']]['wall_time'].append(np.nan)
                     results[name][density['name']]['cpu_time'].append(np.nan)
+                pbar.update(1)
+    pbar.close()
 
-            done += 1
-            if verbose:
-                pct = 100 * done / total
-                sys.stdout.write(
-                    f'\r  [{done:4d}/{total}] {pct:5.1f}%  '
-                    f'run {run_idx+1}/{mc_runs}  {density["name"]:<25s}')
-                sys.stdout.flush()
-
-    if verbose:
-        sys.stdout.write('\r' + ' ' * 80 + '\r')
-        sys.stdout.flush()
+    # ── Save newly computed methods to cache ──
+    if cache_dir:
+        for name, _, _ in compute_methods:
+            save_method_cache(
+                cache_dir, name, results[name], n_samples, mc_runs)
+        if verbose:
+            print(f'  Cache: saved {len(compute_methods)} method(s) to '
+                  f'{cache_dir}')
 
     return results
 
@@ -876,6 +1216,9 @@ METHOD_COLORS = {
     'awkde':              '#843c39',  # dark brick
     'Neural Spline Flow': '#7f7f7f',  # gray
     'Zuko NSF':           '#b5cf6b',  # lime green
+    'Zuko UNAF':          '#9edae5',  # light teal
+    'ARF':                '#aec7e8',  # light blue
+    'TransportMap':       '#c49c94',  # tan
 }
 
 METHOD_MARKERS = {
@@ -893,6 +1236,9 @@ METHOD_MARKERS = {
     'awkde':              'H',
     'Neural Spline Flow': '*',
     'Zuko NSF':           '2',
+    'Zuko UNAF':          '<',
+    'ARF':                '>',
+    'TransportMap':       'P',
 }
 
 
@@ -1179,7 +1525,10 @@ def estimate_flow_time(sample_sizes, mc_runs, methods):
     """Time a single flow fit per sample size and print projected total."""
     flow_methods = [(n, f) for n, f, a in methods
                     if a and (n.startswith('Neural Spline Flow')
-                              or n.startswith('Zuko NSF'))]
+                              or n.startswith('Zuko NSF')
+                              or n.startswith('Zuko UNAF')
+                              or n == 'ARF'
+                              or n == 'TransportMap')]
     if not flow_methods:
         return
     print('  Estimating flow training time...')
@@ -1207,8 +1556,8 @@ def main():
         description='MISE performance comparison on Marron-Wand densities')
     parser.add_argument('--mc-runs', type=int, default=50,
                         help='Monte Carlo runs per density (default: 50)')
-    parser.add_argument('--n-samples', type=int, nargs='+', default=[500],
-                        help='Sample sizes (default: 500; use multiple for panels, '
+    parser.add_argument('--n-samples', type=int, nargs='+', default=[1000],
+                        help='Sample sizes (default: 1000; use multiple for panels, '
                              'e.g. --n-samples 200 1000)')
     parser.add_argument('--no-figures', action='store_true',
                         help='Skip figure generation')
@@ -1221,14 +1570,30 @@ def main():
     parser.add_argument('--include-gmm', action='store_true',
                         help='Include GMM methods (excluded by default; '
                              'unfair structural advantage on MW densities)')
+    parser.add_argument('--no-zuko-unaf', action='store_true',
+                        help='Skip Zuko UNAF (UMNN-based flow)')
+    parser.add_argument('--no-arf', action='store_true',
+                        help='Skip ARF (adversarial random forest)')
+    parser.add_argument('--no-transportmaps', action='store_true',
+                        help='Skip TransportMap density estimation')
     parser.add_argument('--quick', action='store_true',
-                        help='Quick run: 5 MC runs, 200 samples, no flow')
+                        help='Quick run: 5 MC runs, 200 samples, no slow methods')
+    parser.add_argument('--force-rerun', action='store_true',
+                        help='Ignore all caches, recompute everything')
+    parser.add_argument('--force-method', action='append', default=[],
+                        metavar='METHOD',
+                        help='Force rerun of specific method(s) by exact name '
+                             '(repeatable)')
+    parser.add_argument('--no-cache', action='store_true',
+                        help='Disable caching entirely (legacy behavior)')
     args = parser.parse_args()
 
     if args.quick:
         args.mc_runs = 5
         args.n_samples = [200]
         args.no_flow = True
+        args.no_arf = True
+        args.no_transportmaps = True
 
     sample_sizes = args.n_samples
 
@@ -1239,6 +1604,9 @@ def main():
     os.makedirs(data_dir, exist_ok=True)
     os.makedirs(fig_dir, exist_ok=True)
 
+    # Cache directory (None disables caching)
+    cache_dir = None if args.no_cache else os.path.join(data_dir, 'cache')
+
     # Verify MW density weights
     for d in MW_DENSITIES:
         s = sum(d['weights'])
@@ -1247,9 +1615,15 @@ def main():
     # Build method list
     inc_normflows = not (args.no_flow or args.no_normflows)
     inc_zuko = not (args.no_flow or args.no_zuko)
+    inc_zuko_unaf = not (args.no_flow or args.no_zuko_unaf)
+    inc_arf = not args.no_arf
+    inc_tm = not args.no_transportmaps
     methods = build_method_list(include_normflows=inc_normflows,
                                 include_zuko=inc_zuko,
-                                include_gmm=args.include_gmm)
+                                include_gmm=args.include_gmm,
+                                include_zuko_unaf=inc_zuko_unaf,
+                                include_arf=inc_arf,
+                                include_transportmaps=inc_tm)
 
     active = [(n, f, a) for n, f, a in methods if a]
     missing = [n for n, f, a in methods if not a]
@@ -1264,7 +1638,10 @@ def main():
 
     # Flow timing estimate (before committing to full MC loop)
     has_flow = any((n.startswith('Neural Spline Flow')
-                    or n.startswith('Zuko NSF')) and a
+                    or n.startswith('Zuko NSF')
+                    or n.startswith('Zuko UNAF')
+                    or n == 'ARF'
+                    or n == 'TransportMap') and a
                    for n, _, a in active)
     if has_flow:
         estimate_flow_time(sample_sizes, args.mc_runs, active)
@@ -1277,7 +1654,10 @@ def main():
         print(f'  === n_samples = {n_samples} ===')
         t_start = time.time()
         results = run_mc(args.mc_runs, n_samples, active,
-                         MW_DENSITIES, verbose=True)
+                         MW_DENSITIES, verbose=True,
+                         cache_dir=cache_dir,
+                         force_rerun=args.force_rerun,
+                         force_methods=args.force_method)
         elapsed_total = time.time() - t_start
         print(f'  Total MC time: {elapsed_total:.1f}s')
         print()

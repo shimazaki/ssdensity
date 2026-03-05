@@ -352,7 +352,7 @@ def fig_compare_all(results, path):
                 fontsize=6.5, fontfamily='monospace',
                 verticalalignment='top', horizontalalignment='right',
                 bbox=dict(boxstyle='round,pad=0.3', facecolor='white',
-                          edgecolor='0.7', alpha=0.9))
+                          edgecolor='none', alpha=0.9))
 
     # Shared legend
     LW_LEG = 3.0
@@ -427,7 +427,7 @@ def fig_compare_optimized(results, path):
                         label='            ISE      time')
         ax.legend(handles=[header] + handles, loc='upper right', fontsize=7,
                   prop={'family': 'monospace', 'size': 7},
-                  framealpha=0.9, edgecolor='0.7', borderpad=0.4,
+                  framealpha=0.9, edgecolor='none', borderpad=0.4,
                   handlelength=1.8, handletextpad=0.5, labelspacing=0.3)
 
     fig.suptitle(
