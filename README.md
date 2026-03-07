@@ -106,7 +106,7 @@ Gray fill = true density; `sshist` (purple), `sskernel` (blue),
 
 ## Comparison of methods
 
-Ten density estimation methods are evaluated on the 15 Marron-Wand (1992)
+Fourteen density estimation methods are evaluated on the 15 Marron-Wand (1992)
 benchmark densities ($n = 1000$, 50 Monte Carlo runs per density).
 Besides the three ssdensity methods, the comparison includes:
 
@@ -117,6 +117,10 @@ Besides the three ssdensity methods, the comparison includes:
 - **statsmodels KDE** -- normal-reference bandwidth (`statsmodels`)
 - **fastkde** -- self-consistent field bandwidth (Bernacchia & Pigolotti 2011; `fastkde`)
 - **awkde** -- adaptive-width KDE with sensitivity parameter (Cranmer 2001; `awkde`)
+- **Neural Spline Flow** -- normalizing flow with rational-quadratic splines (Durkan et al. 2019; `normflows`)
+- **Zuko UNAF** -- UMNN-based autoregressive flow (Wehenkel & Louppe 2019; `zuko`)
+- **ARF** -- adversarial random forest density estimation (Watson et al. 2023; `arf`)
+- **TransportMap** -- polynomial transport map with KL fit (Marzouk et al.; `TransportMaps`)
 
 All methods use default settings for a fair comparison.
 
