@@ -112,15 +112,15 @@ Besides the three ssdensity methods, the comparison includes:
 
 - **KDE diffusion** -- diffusion-based plug-in bandwidth (Botev et al. 2010; `kde_diffusion`)
 - **KDEpy ISJ** -- Improved Sheather-Jones via diffusion (Nagler 2018; `KDEpy`)
-- **KDEpy Silverman** -- Silverman rule-of-thumb (`KDEpy`)
-- **scipy kde** -- Scott's rule (`scipy.stats.gaussian_kde`)
-- **statsmodels KDE** -- normal-reference bandwidth (`statsmodels`)
+- **KDEpy Silverman** -- Silverman rule-of-thumb (Silverman 1986; `KDEpy`)
+- **scipy kde** -- Scott's rule (Scott 1992; `scipy.stats.gaussian_kde`)
+- **statsmodels KDE** -- normal-reference bandwidth (Silverman 1986; `statsmodels`)
 - **fastkde** -- self-consistent field bandwidth (Bernacchia & Pigolotti 2011; `fastkde`)
 - **awkde** -- adaptive-width KDE with sensitivity parameter (Cranmer 2001; `awkde`)
 - **Neural Spline Flow** -- normalizing flow with rational-quadratic splines (Durkan et al. 2019; `normflows`)
 - **Zuko UNAF** -- UMNN-based autoregressive flow (Wehenkel & Louppe 2019; `zuko`)
 - **ARF** -- adversarial random forest density estimation (Watson et al. 2023; `arf`)
-- **TransportMap** -- polynomial transport map with KL fit (Marzouk et al.; `TransportMaps`)
+- **TransportMap** -- polynomial transport map with KL fit (Marzouk et al. 2016; `TransportMaps`)
 
 All methods use default settings for a fair comparison.
 
