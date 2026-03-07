@@ -1397,9 +1397,13 @@ def _violin_on_ax(ax, ise_vals, methods, n_samples):
                 x_vals.append(m)
                 y_vals.append(np.log10(v))
 
-    # Gradient palette: best (green) → worst (red)
+    # Gradient palette: best (green) → worst (red), ssdensity methods in red
+    _SSDENSITY = {'sskernel', 'ssvkernel', 'sshist'}
     cmap = plt.colormaps['RdYlGn_r']
     palette = {m: cmap(i / max(n_methods - 1, 1)) for i, m in enumerate(order)}
+    for m in _SSDENSITY:
+        if m in palette:
+            palette[m] = '#d62728'
 
     sns.violinplot(x=x_vals, y=y_vals, hue=x_vals, order=order,
                    palette=palette, hue_order=order, legend=False,
