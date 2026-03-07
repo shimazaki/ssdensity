@@ -110,17 +110,17 @@ Fourteen density estimation methods are evaluated on the 15 Marron-Wand (1992)
 benchmark densities ($n = 1000$, 50 Monte Carlo runs per density).
 Besides the three ssdensity methods, the comparison includes:
 
-- **KDE diffusion** -- diffusion-based plug-in bandwidth (Botev et al. 2010; `kde_diffusion`)
-- **KDEpy ISJ** -- Improved Sheather-Jones via diffusion (Nagler 2018; `KDEpy`)
-- **KDEpy Silverman** -- Silverman rule-of-thumb (Silverman 1986; `KDEpy`)
-- **scipy kde** -- Scott's rule (Scott 1992; `scipy.stats.gaussian_kde`)
-- **statsmodels KDE** -- normal-reference bandwidth (Silverman 1986; `statsmodels`)
-- **fastkde** -- self-consistent field bandwidth (Bernacchia & Pigolotti 2011; `fastkde`)
-- **awkde** -- adaptive-width KDE with sensitivity parameter (Cranmer 2001; `awkde`)
-- **Neural Spline Flow** -- normalizing flow with rational-quadratic splines (Durkan et al. 2019; `normflows`)
-- **Zuko UNAF** -- UMNN-based autoregressive flow (Wehenkel & Louppe 2019; `zuko`)
-- **ARF** -- adversarial random forest density estimation (Watson et al. 2023; `arf`)
-- **TransportMap** -- polynomial transport map with KL fit (Marzouk et al. 2016; `TransportMaps`)
+- **KDE diffusion** -- diffusion-based plug-in bandwidth (Botev et al. 2010; [`kde_diffusion`](https://pypi.org/project/kde-diffusion/))
+- **KDEpy ISJ** -- Improved Sheather-Jones via diffusion (Nagler 2018; [`KDEpy`](https://pypi.org/project/KDEpy/))
+- **KDEpy Silverman** -- Silverman rule-of-thumb (Silverman 1986; [`KDEpy`](https://pypi.org/project/KDEpy/))
+- **scipy kde** -- Scott's rule (Scott 1992; [`scipy`](https://pypi.org/project/scipy/))
+- **statsmodels KDE** -- normal-reference bandwidth (Silverman 1986; [`statsmodels`](https://pypi.org/project/statsmodels/))
+- **fastkde** -- self-consistent field bandwidth (Bernacchia & Pigolotti 2011; [`fastkde`](https://pypi.org/project/fastkde/))
+- **awkde** -- adaptive-width KDE with sensitivity parameter (Cranmer 2001; [`awkde`](https://pypi.org/project/awkde/))
+- **Neural Spline Flow** -- normalizing flow with rational-quadratic splines (Durkan et al. 2019; [`normflows`](https://pypi.org/project/normflows/))
+- **Zuko UNAF** -- UMNN-based autoregressive flow (Wehenkel & Louppe 2019; [`zuko`](https://pypi.org/project/zuko/))
+- **ARF** -- adversarial random forest density estimation (Watson et al. 2023; [`arf`](https://pypi.org/project/arf/))
+- **TransportMap** -- polynomial transport map with KL fit (Marzouk et al. 2016; [`TransportMaps`](https://pypi.org/project/TransportMaps/))
 
 All methods use default settings for a fair comparison.
 
