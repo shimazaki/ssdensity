@@ -5,7 +5,7 @@ Two-panel figure showing representative fits on challenging Marron-Wand densitie
   Left:  #3 Strongly skewed (8 cascading components)
   Right: #14 Smooth comb (6 components)
 
-Methods shown: ssvkernel, KDE diffusion, Zuko NSF.
+Methods shown: ssvkernel, KDE diffusion, TransportMap.
 
 Figure style matches benchmarks/marron_wand/compare_methods.py:
   - White background, no grid, only left/bottom spines
@@ -38,7 +38,7 @@ import numpy as np
 from run_mise_comparison import (
     MW_DENSITIES, N_GRID,
     mw_sample, mw_support, mw_pdf, compute_ise,
-    wrap_ssvkernel, wrap_kde_diffusion, wrap_awkde,
+    wrap_ssvkernel, wrap_kde_diffusion, wrap_transportmaps,
     _method_color,
 )
 
@@ -85,7 +85,7 @@ def main():
 
     methods = [
         ('KDE diffusion', wrap_kde_diffusion),
-        ('awkde', wrap_awkde),
+        ('TransportMap', wrap_transportmaps),
         ('ssvkernel', wrap_ssvkernel),
     ]
 

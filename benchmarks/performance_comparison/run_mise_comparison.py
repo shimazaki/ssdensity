@@ -1090,8 +1090,7 @@ def print_tables(agg, ranks, densities, methods, mc_runs, n_samples):
     print()
 
     # ── Time tables ──
-    for time_key, time_label in [('median_wall_time', 'Median wall time (ms)'),
-                                  ('median_cpu_time', 'Median CPU time (ms)')]:
+    for time_key, time_label in [('median_wall_time', 'Median wall time (ms)')]:
         print()
         print(time_label)
         print(f'  {"Density":<{name_w}}', end='')
@@ -1313,17 +1312,12 @@ def _scatter_speed_on_ax(ax, agg, densities, methods, n_samples, time_key,
 
 
 def fig_accuracy_vs_speed(agg, densities, methods, out_dir, n_samples):
-    """Two-panel scatter: CPU time (left) and wall time (right) vs ISE."""
-    fig, axes = plt.subplots(1, 2, figsize=(14, 7))
+    """Single-panel scatter: wall time vs ISE."""
+    fig, ax = plt.subplots(1, 1, figsize=(8, 7))
 
-    _scatter_speed_on_ax(axes[0], agg, densities, methods, n_samples,
-                         'median_cpu_time',
-                         'Median CPU time per fit+evaluate (ms)',
-                         title='CPU time')
-    _scatter_speed_on_ax(axes[1], agg, densities, methods, n_samples,
+    _scatter_speed_on_ax(ax, agg, densities, methods, n_samples,
                          'median_wall_time',
-                         'Median wall time per fit+evaluate (ms)',
-                         title='Wall time')
+                         'Median wall time per fit+evaluate (ms)')
 
     fig.suptitle(f'Accuracy vs Speed  (n={n_samples})', fontsize=13,
                  fontweight='bold', y=1.02)
@@ -1680,22 +1674,26 @@ def main():
     if not args.no_figures and HAS_MATPLOTLIB:
         print()
         print('Generating figures...')
+        # Exclude methods from figures (still computed and cached)
+        _FIG_EXCLUDE = {'Zuko NSF'}
+        fig_methods = [(n, f, a) for n, f, a in active
+                       if not any(n.startswith(ex) for ex in _FIG_EXCLUDE)]
         if len(sample_sizes) >= 2:
             # Multi-panel figures (one column per sample size)
             fig_accuracy_vs_speed_multi(
-                all_agg, MW_DENSITIES, active, fig_dir, sample_sizes)
+                all_agg, MW_DENSITIES, fig_methods, fig_dir, sample_sizes)
             fig_mise_heatmap_multi(
-                all_agg, MW_DENSITIES, active, fig_dir, sample_sizes)
+                all_agg, MW_DENSITIES, fig_methods, fig_dir, sample_sizes)
             fig_ise_violin_multi(
-                all_ise, active, fig_dir, sample_sizes)
+                all_ise, fig_methods, fig_dir, sample_sizes)
         else:
             n_samples = sample_sizes[0]
             fig_accuracy_vs_speed(
-                all_agg[n_samples], MW_DENSITIES, active, fig_dir, n_samples)
+                all_agg[n_samples], MW_DENSITIES, fig_methods, fig_dir, n_samples)
             fig_mise_heatmap(
-                all_agg[n_samples], MW_DENSITIES, active, fig_dir, n_samples)
+                all_agg[n_samples], MW_DENSITIES, fig_methods, fig_dir, n_samples)
             fig_ise_violin(
-                all_ise[n_samples], active, fig_dir, n_samples)
+                all_ise[n_samples], fig_methods, fig_dir, n_samples)
         print()
     elif args.no_figures:
         print('  Figures skipped (--no-figures)')

@@ -124,7 +124,7 @@ All methods use default settings for a fair comparison.
 
 ![Density overlay](https://raw.githubusercontent.com/shimazaki/ssdensity/master/benchmarks/performance_comparison/fig/density_overlay.png)
 
-Three representative Marron–Wand densities (n=1000): #3 Strongly skewed (8 cascading components), #10 Claw (narrow spikes on a broad mode), and #14 Smooth comb (6 components at different scales). The gray fill shows the true density. `ssvkernel` (orange) closely tracks the true shape, while KDE diffusion slightly over-smooths the fine structure and `awkde` misses it entirely.
+Three representative Marron–Wand densities (n=1000): #3 Strongly skewed (8 cascading components), #10 Claw (narrow spikes on a broad mode), and #14 Smooth comb (6 components at different scales). The gray fill shows the true density. `ssvkernel` (orange) closely tracks the true shape, while KDE diffusion slightly over-smooths the fine structure and TransportMap struggles with multi-scale detail.
 
 ### Assessment of estimation error
 
@@ -143,18 +143,9 @@ For the best accuracy on complex shapes, `ssvkernel` wins.
 
 ![Accuracy vs Speed](https://raw.githubusercontent.com/shimazaki/ssdensity/master/benchmarks/performance_comparison/fig/accuracy_vs_speed.png)
 
-Pooled median ISE (y-axis, log scale) versus mean computation time per
-fit-and-evaluate call (x-axis, log scale). The left panel shows CPU time
-(`time.process_time`, summed across all threads); the right panel shows wall
-time (`time.perf_counter`). Points closer to the lower-left corner are both
-more accurate and faster.
-
-**Note on CPU time vs wall time:** NumPy is linked against Intel MKL, which
-parallelizes both BLAS operations and element-wise math (via VML) across all
-available cores. Methods that rely on large array operations (e.g., KDE
-diffusion, `sshist`) can show CPU time much higher than wall time because MKL
-spreads the work across many threads. Wall time is the more meaningful metric
-for end-user latency.
+Pooled median ISE (y-axis, log scale) versus mean wall time per
+fit-and-evaluate call (x-axis, log scale). Points closer to the lower-left
+corner are both more accurate and faster.
 
 ### Error by method and density
 

@@ -131,15 +131,15 @@ def bench_awkde(x, t_grid):
 # ---------------------------------------------------------------------------
 
 def time_func(func, x, t_grid, n_runs):
-    """Run func n_runs times, return median CPU time in seconds."""
+    """Run func n_runs times, return median wall time in seconds."""
     # Warmup
     func(x, t_grid)
 
     times = []
     for _ in range(n_runs):
-        t0 = time.process_time()
+        t0 = time.perf_counter()
         func(x, t_grid)
-        elapsed = time.process_time() - t0
+        elapsed = time.perf_counter() - t0
         times.append(elapsed)
     return np.median(times)
 
